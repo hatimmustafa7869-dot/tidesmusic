@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  soundflow:
+    build: .
+    container_name: soundflow-app
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - YOUTUBE_API_KEY=AIzaSyBD3kLZd4PMOhNKS0k6qQOlig_svmqmtGY
+      - JWT_SECRET=change-this-to-a-random-secret-key-on-production
+      - DATABASE_PATH=/app/data/soundflow.db
+      - HOST=0.0.0.0
+      - PORT=8000
+    volumes:
+      - soundflow_data:/app/data
+
+volumes:
+  soundflow_data:
+    driver: local

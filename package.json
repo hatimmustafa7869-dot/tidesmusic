@@ -1,0 +1,13 @@
+{
+  "name": "soundflow-desktop",
+  "version": "1.0.0",
+  "description": "Spotify-style Music App with YouTube Music Streaming and Background Playback",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "python run.py",
+    "desktop": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^34.2.0"
+  }
+}
