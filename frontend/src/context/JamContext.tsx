@@ -32,7 +32,7 @@ const JamContext = createContext<JamContextType | undefined>(undefined);
 
 export const JamProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const { currentTrack, isPlaying, currentTime, queue, syncRemotePlayback, registerPlaybackEventListener } = useAudio();
+  const { currentTrack, isPlaying, currentTime, queue, syncRemotePlayback, registerPlaybackEventListener, unlockAudio } = useAudio();
 
   const [jamId, setJamId] = useState<string | null>(null);
   const [participants, setParticipants] = useState<JamParticipant[]>([]);
@@ -75,36 +75,56 @@ export const JamProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     ws.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data);
-        const { type } = data;
+        const type = data.type || data.action;
 
         if (type === 'SYNC_STATE') {
           const { state } = data;
           if (state) {
-            setParticipants(state.participants || []);
+            const mapped = (state.participants || []).map((p: any) => ({
+              id: p.id || p.user_id,
+              name: p.name || p.user_name || 'Listener',
+              is_host: !!(p.is_host || p.isHost)
+            }));
+            setParticipants(mapped);
             setIsHost(state.host_id === myIdRef.current);
             if (state.current_track) {
               syncRemotePlayback(state.current_track, state.is_playing, state.current_time || 0, state.queue);
             }
           }
-        } else if (type === 'USER_JOINED') {
-          if (data.state) {
-            setParticipants(data.state.participants || []);
+        } else if (type === 'USER_JOINED' || type === 'USER_LEFT') {
+          if (data.state && data.state.participants) {
+            const mapped = data.state.participants.map((p: any) => ({
+              id: p.id || p.user_id,
+              name: p.name || p.user_name || 'Listener',
+              is_host: !!(p.is_host || p.isHost)
+            }));
+            setParticipants(mapped);
           }
-        } else if (type === 'USER_LEFT') {
-          if (data.state) {
-            setParticipants(data.state.participants || []);
-          }
-        } else if (type === 'PLAY_TRACK') {
+        } else if (
+          type === 'PLAY_TRACK' ||
+          type === 'CHANGE_TRACK' ||
+          (data.type === 'PLAYBACK_UPDATE' && (data.action === 'CHANGE_TRACK' || (data.action === 'PLAY' && data.track)))
+        ) {
           if (data.sender_id !== myIdRef.current && data.track) {
-            syncRemotePlayback(data.track, true, data.current_time || 0, data.queue);
+            syncRemotePlayback(data.track, true, data.current_time || data.start_time || 0, data.queue);
           }
-        } else if (type === 'TOGGLE_PLAY') {
-          if (data.sender_id !== myIdRef.current && currentTrack) {
-            syncRemotePlayback(currentTrack, data.is_playing, data.current_time || currentTime);
+        } else if (
+          type === 'TOGGLE_PLAY' ||
+          (data.type === 'PLAYBACK_UPDATE' && (data.action === 'PLAY' || data.action === 'PAUSE'))
+        ) {
+          if (data.sender_id !== myIdRef.current) {
+            const isPl = data.is_playing !== undefined ? data.is_playing : (data.action === 'PLAY');
+            const targetTrack = data.track || currentTrack;
+            if (targetTrack) {
+              syncRemotePlayback(targetTrack, isPl, data.current_time !== undefined ? data.current_time : currentTime);
+            }
           }
-        } else if (type === 'SEEK') {
-          if (data.sender_id !== myIdRef.current && currentTrack) {
-            syncRemotePlayback(currentTrack, isPlaying, data.current_time || 0);
+        } else if (type === 'SEEK' || (data.type === 'PLAYBACK_UPDATE' && data.action === 'SEEK')) {
+          if (data.sender_id !== myIdRef.current) {
+            const targetTrack = data.track || currentTrack;
+            if (targetTrack) {
+              syncRemotePlayback(targetTrack, isPlaying, data.current_time || 0);
+            }
           }
         } else if (type === 'REACTION') {
           const reactionId = `react-${Date.now()}-${Math.random()}`;
@@ -127,7 +147,14 @@ export const JamProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.log('Jam WebSocket disconnected');
     };
 
+    const pingInterval = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'PING' }));
+      }
+    }, 25000);
+
     return () => {
+      clearInterval(pingInterval);
       ws.close();
       wsRef.current = null;
     };
@@ -147,20 +174,26 @@ export const JamProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (event.type === 'PLAY_TRACK') {
         ws.send(JSON.stringify({
           type: 'PLAY_TRACK',
+          action: 'CHANGE_TRACK',
           track: event.track,
           queue: event.queue,
-          start_time: 0
+          start_time: 0,
+          current_time: 0
         }));
       } else if (event.type === 'TOGGLE_PLAY') {
         ws.send(JSON.stringify({
           type: 'TOGGLE_PLAY',
+          action: event.is_playing ? 'PLAY' : 'PAUSE',
           is_playing: event.is_playing,
-          current_time: event.current_time
+          current_time: event.current_time,
+          track: currentTrack
         }));
       } else if (event.type === 'SEEK') {
         ws.send(JSON.stringify({
           type: 'SEEK',
-          current_time: event.current_time
+          action: 'SEEK',
+          current_time: event.current_time,
+          track: currentTrack
         }));
       }
     });
@@ -168,7 +201,7 @@ export const JamProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => {
       registerPlaybackEventListener(null);
     };
-  }, [jamId]);
+  }, [jamId, currentTrack]);
 
   // Check URL on load for ?jam=CODE parameter
   useEffect(() => {
@@ -183,6 +216,7 @@ export const JamProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const createJam = async (): Promise<string> => {
     try {
+      unlockAudio();
       const res = await fetch('/api/jam/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -203,9 +237,11 @@ export const JamProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
             wsRef.current.send(JSON.stringify({
               type: 'PLAY_TRACK',
+              action: 'CHANGE_TRACK',
               track: currentTrack,
               queue,
-              start_time: currentTime
+              start_time: currentTime,
+              current_time: currentTime
             }));
           }
         }, 500);
@@ -219,6 +255,7 @@ export const JamProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const joinJam = async (codeOrUrl: string): Promise<boolean> => {
+    unlockAudio();
     let code = codeOrUrl.trim().toUpperCase();
     if (code.includes('JAM=')) {
       code = code.split('JAM=')[1].split('&')[0];

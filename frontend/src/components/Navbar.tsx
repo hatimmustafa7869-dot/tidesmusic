@@ -6,10 +6,12 @@ import {
   Download,
   Home,
   LogOut,
+  Radio,
   Search,
   X
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useJam } from '../context/JamContext';
 
 interface NavbarProps {
   onSearch: (query: string) => void;
@@ -40,6 +42,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onGoForward
 }) => {
   const { user, isAuthenticated, logout } = useAuth();
+  const { isJamActive, setIsJamModalOpen, participants } = useJam();
   const [query, setQuery] = useState(initialQuery);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
@@ -159,8 +162,22 @@ export const Navbar: React.FC<NavbarProps> = ({
         </form>
       </div>
 
-      {/* Right: Download App, Import & Profile / Auth */}
-      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+      {/* Right: Jam, Download App, Import & Profile / Auth */}
+      <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+        {/* Spotify Jam Quick Button (Always accessible on Mobile & Desktop) */}
+        <button
+          onClick={() => setIsJamModalOpen(true)}
+          title={isJamActive ? `In Jam (${participants.length} listeners)` : "Spotify Jam"}
+          className={`flex items-center gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-full border text-xs font-bold transition hover:scale-105 active:scale-95 shadow-sm shrink-0 ${
+            isJamActive
+              ? 'bg-[#1ed760] text-black border-[#1ed760] shadow-[0_0_12px_rgba(30,215,96,0.6)] animate-pulse'
+              : 'bg-[#1f1f1f] hover:bg-[#282828] border-white/10 text-zinc-300 hover:text-white'
+          }`}
+        >
+          <Radio className={`w-4 h-4 shrink-0 ${isJamActive ? 'text-black' : 'text-[#1ed760]'}`} />
+          <span className="hidden sm:inline">{isJamActive ? `Jam (${participants.length})` : 'Jam'}</span>
+        </button>
+
         {/* Download App Action Button */}
         <button
           onClick={onOpenDownloadApp}

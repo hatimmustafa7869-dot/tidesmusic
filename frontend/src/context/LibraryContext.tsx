@@ -91,24 +91,18 @@ export const LibraryProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [isAuthenticated, user?.id]);
 
-  // Persist locally for offline or guest usage
+  // Persist locally for instant loading on page refresh and offline usage
   useEffect(() => {
-    if (!isAuthenticated) {
-      localStorage.setItem(STORAGE_KEY_PLAYLISTS, JSON.stringify(playlists));
-    }
-  }, [playlists, isAuthenticated]);
+    localStorage.setItem(STORAGE_KEY_PLAYLISTS, JSON.stringify(playlists));
+  }, [playlists]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      localStorage.setItem(STORAGE_KEY_FAVORITES, JSON.stringify(favorites));
-    }
-  }, [favorites, isAuthenticated]);
+    localStorage.setItem(STORAGE_KEY_FAVORITES, JSON.stringify(favorites));
+  }, [favorites]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(history));
-    }
-  }, [history, isAuthenticated]);
+    localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(history));
+  }, [history]);
 
   const createPlaylist = async (title: string, description: string = ''): Promise<Playlist> => {
     if (isAuthenticated) {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, Play } from 'lucide-react';
 import { TrackCard } from '../components/TrackCard';
 import { TrackRow } from '../components/TrackRow';
@@ -24,17 +24,34 @@ export const SearchPage: React.FC<SearchPageProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const activeSearchIdRef = useRef<number>(0);
+
   const executeSearch = async (searchQuery: string, typeFilter: 'all' | 'songs' | 'playlists') => {
-    if (!searchQuery.trim()) return;
+    const searchId = ++activeSearchIdRef.current;
+    const trimmed = searchQuery.trim();
+
+    if (!trimmed) {
+      setResults([]);
+      setError('');
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError('');
+
     try {
-      const data = await api.search(searchQuery.trim(), typeFilter);
-      setResults(data.results || []);
-      setLoading(false);
+      const data = await api.search(trimmed, typeFilter);
+      // Only set results if this request is still the newest active search
+      if (searchId === activeSearchIdRef.current) {
+        setResults(data.results || []);
+        setLoading(false);
+      }
     } catch (err: any) {
-      setError('Search failed. Please try again.');
-      setLoading(false);
+      if (searchId === activeSearchIdRef.current) {
+        setError('Search failed. Please try again.');
+        setLoading(false);
+      }
     }
   };
 
@@ -43,6 +60,8 @@ export const SearchPage: React.FC<SearchPageProps> = ({
     if (initialQuery.trim()) {
       executeSearch(initialQuery.trim(), filter);
     } else {
+      // Invalidate any active in-flight searches immediately
+      activeSearchIdRef.current++;
       setResults([]);
       setError('');
       setLoading(false);

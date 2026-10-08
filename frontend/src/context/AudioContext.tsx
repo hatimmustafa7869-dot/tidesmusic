@@ -39,6 +39,7 @@ interface AudioContextType {
   clearQueue: () => void;
   syncRemotePlayback: (track: Track, isPlaying: boolean, currentTime: number, newQueue?: Track[]) => void;
   registerPlaybackEventListener: (listener: ((event: any) => void) | null) => void;
+  unlockAudio: () => void;
 }
 
 const AudioContext = createContext<AudioContextType | undefined>(undefined);
@@ -68,18 +69,60 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const userExplicitPauseRef = useRef<boolean>(false);
   const silentAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
+  const STORAGE_CURRENT_TRACK = 'soundflow_current_track';
+  const STORAGE_QUEUE = 'soundflow_queue';
+  const STORAGE_QUEUE_INDEX = 'soundflow_queue_index';
+  const STORAGE_CURRENT_TIME = 'soundflow_current_time';
+
+  const [currentTrack, setCurrentTrack] = useState<Track | null>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_CURRENT_TRACK);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [currentTime, setCurrentTime] = useState<number>(0);
-  const [duration, setDuration] = useState<number>(0);
+  const [currentTime, setCurrentTime] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_CURRENT_TIME);
+      return saved !== null ? parseFloat(saved) : 0;
+    } catch {
+      return 0;
+    }
+  });
+  const [duration, setDuration] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_CURRENT_TRACK);
+      if (saved) {
+        const t = JSON.parse(saved);
+        return t.duration || 0;
+      }
+    } catch {}
+    return 0;
+  });
   const [volume, setVolumeState] = useState<number>(() => {
     const saved = localStorage.getItem('soundflow_volume');
     return saved !== null ? parseFloat(saved) : 0.8;
   });
   const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [queue, setQueue] = useState<Track[]>([]);
-  const [queueIndex, setQueueIndex] = useState<number>(-1);
+  const [queue, setQueue] = useState<Track[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_QUEUE);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [queueIndex, setQueueIndex] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_QUEUE_INDEX);
+      return saved !== null ? parseInt(saved, 10) : -1;
+    } catch {
+      return -1;
+    }
+  });
   const [shuffle, setShuffle] = useState<boolean>(false);
   const [repeat, setRepeat] = useState<RepeatMode>('off');
 
@@ -245,6 +288,41 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       audio.pause();
     };
   }, []);
+
+  // On mount: prepare loaded track from localStorage if present without auto-playing
+  useEffect(() => {
+    if (currentTrack && audioRef.current && !audioRef.current.src) {
+      audioRef.current.src = api.getStreamUrl(currentTrack.id);
+      if (currentTime > 0) {
+        audioRef.current.currentTime = currentTime;
+      }
+    }
+  }, []);
+
+  // Persist playback state to localStorage for seamless page refreshes
+  useEffect(() => {
+    if (currentTrack) {
+      localStorage.setItem(STORAGE_CURRENT_TRACK, JSON.stringify(currentTrack));
+    }
+  }, [currentTrack]);
+
+  useEffect(() => {
+    if (queue && queue.length > 0) {
+      localStorage.setItem(STORAGE_QUEUE, JSON.stringify(queue));
+    }
+  }, [queue]);
+
+  useEffect(() => {
+    if (queueIndex >= 0) {
+      localStorage.setItem(STORAGE_QUEUE_INDEX, queueIndex.toString());
+    }
+  }, [queueIndex]);
+
+  useEffect(() => {
+    if (currentTrack && currentTime > 0) {
+      localStorage.setItem(STORAGE_CURRENT_TIME, Math.floor(currentTime).toString());
+    }
+  }, [Math.floor(currentTime / 5)]);
 
   // Update volume & muted across both engines
   useEffect(() => {
@@ -552,6 +630,26 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     playbackEventListenerRef.current = listener;
   };
 
+  const unlockAudio = () => {
+    try {
+      if (silentAudioRef.current) {
+        silentAudioRef.current.play().then(() => {
+          if (!isPlaying) silentAudioRef.current?.pause();
+        }).catch(() => {});
+      }
+      if (audioRef.current) {
+        const dummy = audioRef.current.play();
+        if (dummy) {
+          dummy.then(() => {
+            if (!isPlaying) audioRef.current?.pause();
+          }).catch(() => {});
+        }
+      }
+    } catch (e) {
+      console.warn('Unlock audio failed:', e);
+    }
+  };
+
   const syncRemotePlayback = (track: Track, shouldPlay: boolean, time: number, newQueue?: Track[]) => {
     isSyncingFromRemoteRef.current = true;
     if (newQueue && newQueue.length > 0) {
@@ -560,50 +658,65 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setQueueIndex(idx !== -1 ? idx : 0);
     }
 
-    if (activeEngineRef.current === 'yt' && ytPlayerRef.current) {
-      const player = ytPlayerRef.current;
-      if (!currentTrack || currentTrack.id !== track.id) {
-        setCurrentTrack(track);
-        setIsLoading(true);
-        setCurrentTime(time);
-        playWithYouTube(track, time);
+    if (!currentTrack || currentTrack.id !== track.id) {
+      if (shouldPlay) {
+        loadAndPlayTrack(track);
+        if (time > 1) {
+          setTimeout(() => {
+            seek(time);
+          }, 600);
+        }
       } else {
+        setCurrentTrack(track);
+        setIsLoading(false);
+        setIsPlaying(false);
+        setCurrentTime(time);
+        setDuration(track.duration || 0);
+        if (audioRef.current) {
+          audioRef.current.src = api.getStreamUrl(track.id);
+          audioRef.current.currentTime = time;
+          audioRef.current.pause();
+        }
+      }
+    } else {
+      // Same track: sync playback state and position
+      if (activeEngineRef.current === 'yt' && ytPlayerRef.current) {
+        const player = ytPlayerRef.current;
         if (Math.abs(currentTime - time) > 2) {
           player.seekTo(time, true);
           setCurrentTime(time);
         }
-        if (shouldPlay) player.playVideo();
-        else player.pauseVideo();
-      }
-    } else {
-      const audio = audioRef.current;
-      if (!audio) {
-        isSyncingFromRemoteRef.current = false;
-        return;
-      }
-
-      if (!currentTrack || currentTrack.id !== track.id) {
-        setCurrentTrack(track);
-        setIsLoading(true);
-        setCurrentTime(time);
-        setDuration(track.duration || 0);
-        audio.src = api.getStreamUrl(track.id);
-        audio.currentTime = time;
-        if (shouldPlay) audio.play().catch(console.warn);
-        else audio.pause();
-      } else {
-        if (Math.abs(audio.currentTime - time) > 2) {
-          audio.currentTime = time;
-          setCurrentTime(time);
+        if (shouldPlay) {
+          player.playVideo();
+          setIsPlaying(true);
+        } else {
+          player.pauseVideo();
+          setIsPlaying(false);
         }
-        if (shouldPlay && audio.paused) audio.play().catch(console.warn);
-        else if (!shouldPlay && !audio.paused) audio.pause();
+      } else {
+        const audio = audioRef.current;
+        if (audio) {
+          if (Math.abs(audio.currentTime - time) > 2) {
+            audio.currentTime = time;
+            setCurrentTime(time);
+          }
+          if (shouldPlay && audio.paused) {
+            audio.play().catch(err => {
+              console.warn('Sync audio play error, trying YT fallback:', err);
+              playWithYouTube(track, time);
+            });
+            setIsPlaying(true);
+          } else if (!shouldPlay && !audio.paused) {
+            audio.pause();
+            setIsPlaying(false);
+          }
+        }
       }
     }
 
     setTimeout(() => {
       isSyncingFromRemoteRef.current = false;
-    }, 400);
+    }, 500);
   };
 
   const playTrack = (track: Track, newQueue?: Track[]) => {
@@ -836,7 +949,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         removeFromQueue,
         clearQueue,
         syncRemotePlayback,
-        registerPlaybackEventListener
+        registerPlaybackEventListener,
+        unlockAudio
       }}
     >
       {children}

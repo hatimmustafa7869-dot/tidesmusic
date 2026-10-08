@@ -164,7 +164,19 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.get('/api/auth/me', authenticateToken, (req, res) => {
   const user = db.users.find(u => u.id === req.user.sub);
-  if (!user) return res.status(404).json({ detail: 'User not found' });
+  if (!user) {
+    if (req.user && req.user.sub) {
+      return res.json({
+        user: {
+          id: req.user.sub,
+          username: req.user.username || 'Listener',
+          email: req.user.email || '',
+          created_at: new Date().toISOString()
+        }
+      });
+    }
+    return res.status(404).json({ detail: 'User not found' });
+  }
   res.json({ user: { id: user.id, username: user.username, email: user.email, created_at: user.createdAt } });
 });
 
@@ -448,10 +460,216 @@ app.get('/api/search', async (req, res) => {
   res.json({ results: [] });
 });
 
+async function parseSpotifyEmbedHtml(html, cleanId) {
+  const nextIdx = html.indexOf('<script id="__NEXT_DATA__" type="application/json">');
+  if (nextIdx === -1) {
+    throw new Error('Spotify playlist metadata not found in embed');
+  }
+
+  const jsonStart = nextIdx + '<script id="__NEXT_DATA__" type="application/json">'.length;
+  const jsonEnd = html.indexOf('</script>', jsonStart);
+  const data = JSON.parse(html.substring(jsonStart, jsonEnd));
+  const entity = data.props?.pageProps?.state?.data?.entity || {};
+
+  const title = entity.title || entity.name || 'Spotify Playlist';
+  const subtitle = entity.subtitle || 'Spotify';
+  const description = entity.description || `Playlist imported from ${subtitle}`;
+
+  let thumbnail = '';
+  const coverArt = entity.coverArt?.sources || [];
+  if (coverArt.length > 0) thumbnail = coverArt[0].url;
+  if (!thumbnail && entity.visualIdentity?.image?.length > 0) {
+    thumbnail = entity.visualIdentity.image.slice(-1)[0].url;
+  }
+
+  const trackList = entity.trackList || [];
+  const rawTracks = trackList.map((t, idx) => {
+    const tTitle = t.title || 'Unknown Title';
+    const tArtist = t.subtitle || subtitle || 'Artist';
+    const durSec = Math.floor((t.duration || 0) / 1000);
+    const m = Math.floor(durSec / 60);
+    const s = durSec % 60;
+    const durFmt = durSec > 0 ? `${m}:${s < 10 ? '0' : ''}${s}` : '3:30';
+    const uri = t.uri || '';
+    const spId = uri.includes(':') ? uri.split(':').pop() : (t.uid || `tr_${idx}`);
+    const synthId = `sp__${spId}__${encodeURIComponent(tTitle.substring(0, 40))}__${encodeURIComponent(tArtist.substring(0, 40))}`;
+
+    return {
+      id: synthId,
+      title: tTitle,
+      artist: tArtist,
+      thumbnail: thumbnail || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80',
+      duration: durSec,
+      durationFormatted: durFmt,
+      type: 'song'
+    };
+  });
+
+  // Concurrently resolve the top 12 tracks to real YouTube IDs for zero-latency start!
+  const topTracksToResolve = rawTracks.slice(0, 12);
+  await Promise.all(topTracksToResolve.map(async (track) => {
+    try {
+      const q = `${track.title} ${track.artist}`.trim();
+      const s = await scrapeSearch(q);
+      if (s.length > 0 && s[0].id) {
+        track.id = s[0].id;
+        if (s[0].thumbnail) track.thumbnail = s[0].thumbnail;
+      }
+    } catch {}
+  }));
+
+  return {
+    info: {
+      id: `spotify:${cleanId}`,
+      title,
+      description,
+      thumbnail,
+      itemCount: rawTracks.length
+    },
+    tracks: rawTracks
+  };
+}
+
+async function scrapeSpotifyPlaylist(spotifyInput) {
+  let cleanId = spotifyInput.replace('spotify:playlist:', '').replace('spotify:album:', '').replace('spotify:', '').trim();
+  if (cleanId.includes('?')) cleanId = cleanId.split('?')[0];
+  if (cleanId.includes('/')) cleanId = cleanId.split('/').pop();
+
+  const url = `https://open.spotify.com/embed/playlist/${cleanId}`;
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9'
+    }
+  });
+
+  if (!response.ok) {
+    const albumUrl = `https://open.spotify.com/embed/album/${cleanId}`;
+    const albumRes = await fetch(albumUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+    if (!albumRes.ok) {
+      throw new Error(`Spotify embed returned HTTP ${response.status}`);
+    }
+    return parseSpotifyEmbedHtml(await albumRes.text(), cleanId);
+  }
+
+  const html = await response.text();
+  return parseSpotifyEmbedHtml(html, cleanId);
+}
+
+async function scrapeYouTubePlaylist(playlistId) {
+  let cleanId = playlistId.trim();
+  if (cleanId.includes('list=')) {
+    cleanId = cleanId.split('list=')[1].split('&')[0];
+  }
+
+  const url = `https://www.youtube.com/playlist?list=${cleanId}`;
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept-Language': 'en-US,en;q=0.9'
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`YouTube returned HTTP ${response.status}`);
+  }
+
+  const html = await response.text();
+  const startIdx = html.indexOf('var ytInitialData = ');
+  if (startIdx === -1) {
+    throw new Error('ytInitialData not found');
+  }
+  const jsonStart = startIdx + 'var ytInitialData = '.length;
+  const jsonEnd = html.indexOf(';</script>', jsonStart);
+  if (jsonEnd === -1) {
+    throw new Error('ytInitialData end script not found');
+  }
+  const data = JSON.parse(html.substring(jsonStart, jsonEnd));
+
+  const title = data.metadata?.playlistMetadataRenderer?.title ||
+                data.microformat?.microformatDataRenderer?.title ||
+                'YouTube Playlist';
+  const description = data.metadata?.playlistMetadataRenderer?.description || '';
+  const thumbnail = data.microformat?.microformatDataRenderer?.thumbnail?.thumbnails?.slice(-1)[0]?.url ||
+                    'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80';
+
+  const tracks = [];
+  const contents = data.contents?.twoColumnBrowseResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents?.[0]?.itemSectionRenderer?.contents || [];
+
+  for (const item of contents) {
+    if (item.playlistVideoRenderer) {
+      const v = item.playlistVideoRenderer;
+      if (v.videoId) {
+        const durStr = v.lengthText?.simpleText || '3:30';
+        let durSec = 0;
+        if (durStr) {
+          const parts = durStr.split(':').map(Number);
+          durSec = parts.length === 3 ? parts[0] * 3600 + parts[1] * 60 + parts[2] : (parts[0] || 0) * 60 + (parts[1] || 0);
+        }
+        tracks.push({
+          id: v.videoId,
+          title: v.title?.runs?.[0]?.text || v.title?.simpleText || 'Unknown Song',
+          artist: v.shortBylineText?.runs?.[0]?.text || 'Unknown Artist',
+          thumbnail: v.thumbnail?.thumbnails?.slice(-1)[0]?.url || `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`,
+          duration: durSec,
+          durationFormatted: durStr,
+          type: 'song'
+        });
+      }
+    } else if (item.lockupViewModel) {
+      const v = item.lockupViewModel;
+      const vid = v.contentId;
+      if (vid && v.contentType === 'LOCKUP_CONTENT_TYPE_VIDEO') {
+        const meta = v.metadata?.lockupMetadataViewModel;
+        const songTitle = meta?.title?.content || 'Unknown Song';
+        const artistParts = meta?.metadata?.contentMetadataViewModel?.metadataRows?.[0]?.metadataParts || [];
+        const artist = artistParts.map(p => p.text?.content || '').join(' ').trim() || 'Unknown Artist';
+
+        let durFormatted = '3:30';
+        let durSec = 210;
+        const label = v.rendererContext?.accessibilityContext?.label || '';
+        const durMatch = label.match(/(\d+)\s+minutes?(?:,\s*(\d+)\s+seconds?)?/);
+        if (durMatch) {
+          const m = parseInt(durMatch[1] || '0', 10);
+          const s = parseInt(durMatch[2] || '0', 10);
+          durSec = m * 60 + s;
+          durFormatted = `${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        tracks.push({
+          id: vid,
+          title: songTitle,
+          artist,
+          thumbnail: `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`,
+          duration: durSec,
+          durationFormatted: durFormatted,
+          type: 'song'
+        });
+      }
+    }
+  }
+
+  return {
+    info: {
+      id: cleanId,
+      title,
+      description,
+      thumbnail,
+      itemCount: tracks.length
+    },
+    tracks
+  };
+}
+
 app.get('/api/playlist/:id', async (req, res) => {
   const playlistId = req.params.id;
 
-  // Check if it's a user playlist first
+  // 1. Check if it's a user playlist first
   const userPl = db.playlists.find(p => p.id === playlistId);
   if (userPl) {
     return res.json({
@@ -466,7 +684,34 @@ app.get('/api/playlist/:id', async (req, res) => {
     });
   }
 
-  // Fetch from YouTube Data API
+  // 2. Spotify Playlist or Album
+  if (
+    playlistId.startsWith('spotify:') ||
+    playlistId.startsWith('spotify_') ||
+    playlistId.includes('open.spotify.com') ||
+    (playlistId.length === 22 && !playlistId.includes('_') && !playlistId.includes('-'))
+  ) {
+    try {
+      const spData = await scrapeSpotifyPlaylist(playlistId);
+      if (spData && spData.tracks && spData.tracks.length > 0) {
+        return res.json(spData);
+      }
+    } catch (spErr) {
+      console.warn('Spotify scrape notice:', spErr.message);
+    }
+  }
+
+  // 3. YouTube Playlist (Scrape first - 0 quota, fast)
+  try {
+    const ytData = await scrapeYouTubePlaylist(playlistId);
+    if (ytData && ytData.tracks && ytData.tracks.length > 0) {
+      return res.json(ytData);
+    }
+  } catch (ytScrapeErr) {
+    console.warn('YouTube playlist scraper notice:', ytScrapeErr.message);
+  }
+
+  // 4. Fallback to YouTube Data API v3 if key available
   try {
     const pUrl = `https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&id=${playlistId}&key=${YOUTUBE_API_KEY}`;
     const pRes = await fetch(pUrl);
@@ -480,12 +725,14 @@ app.get('/api/playlist/:id', async (req, res) => {
     const videoIds = (piData.items || []).map(i => i.contentDetails?.videoId).filter(Boolean);
     let durationMap = {};
     if (videoIds.length > 0) {
-      const vUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${videoIds.join(',')}&key=${YOUTUBE_API_KEY}`;
-      const vRes = await fetch(vUrl);
-      const vData = await vRes.json();
-      (vData.items || []).forEach(it => {
-        durationMap[it.id] = parseIsoDuration(it.contentDetails?.duration);
-      });
+      try {
+        const vUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${videoIds.join(',')}&key=${YOUTUBE_API_KEY}`;
+        const vRes = await fetch(vUrl);
+        const vData = await vRes.json();
+        (vData.items || []).forEach(it => {
+          durationMap[it.id] = parseIsoDuration(it.contentDetails?.duration);
+        });
+      } catch {}
     }
 
     const tracks = (piData.items || []).map(item => {
@@ -502,19 +749,23 @@ app.get('/api/playlist/:id', async (req, res) => {
       };
     });
 
-    res.json({
-      info: {
-        id: playlistId,
-        title: pItem?.snippet?.title || 'Playlist',
-        description: pItem?.snippet?.description || '',
-        thumbnail: pItem?.snippet?.thumbnails?.high?.url || '',
-        itemCount: tracks.length
-      },
-      tracks
-    });
+    if (tracks.length > 0) {
+      return res.json({
+        info: {
+          id: playlistId,
+          title: pItem?.snippet?.title || 'Playlist',
+          description: pItem?.snippet?.description || '',
+          thumbnail: pItem?.snippet?.thumbnails?.high?.url || '',
+          itemCount: tracks.length
+        },
+        tracks
+      });
+    }
   } catch (err) {
-    res.json({ info: { id: playlistId, title: 'Playlist', thumbnail: '' }, tracks: [] });
+    console.error('YouTube Data API playlist error:', err.message);
   }
+
+  res.json({ info: { id: playlistId, title: 'Playlist', thumbnail: '' }, tracks: [] });
 });
 
 app.get('/api/upnext/:videoId', async (req, res) => {
@@ -542,19 +793,33 @@ app.get('/api/upnext/:videoId', async (req, res) => {
 app.get('/api/lyrics/:videoId', async (req, res) => {
   const { videoId } = req.params;
   try {
-    // 1. Get video title & artist from YouTube Data API
-    const vUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${YOUTUBE_API_KEY}`;
-    const vRes = await fetch(vUrl);
-    const vData = await vRes.json();
-    const item = (vData.items || [])[0];
-    const rawTitle = item?.snippet?.title || '';
-    const artist = item?.snippet?.channelTitle?.replace(/ - Topic|VEVO/g, '').trim() || '';
+    let cleanTitle = '';
+    let artist = '';
 
-    // Clean title for lyrics match
-    const cleanTitle = rawTitle
-      .replace(/\(.*?\)|\[.*?\]/g, '')
-      .replace(/ft\..*|feat\..*|official video|lyric video/gi, '')
-      .trim();
+    if (videoId.startsWith('sp__')) {
+      const parts = videoId.split('__');
+      cleanTitle = decodeURIComponent(parts[2] || '').replace(/\(.*?\)|\[.*?\]/g, '').trim();
+      artist = decodeURIComponent(parts[3] || '').trim();
+    } else {
+      // 1. Get video title & artist from YouTube Data API or scraper
+      try {
+        const vUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${YOUTUBE_API_KEY}`;
+        const vRes = await fetch(vUrl);
+        const vData = await vRes.json();
+        const item = (vData.items || [])[0];
+        const rawTitle = item?.snippet?.title || '';
+        artist = item?.snippet?.channelTitle?.replace(/ - Topic|VEVO/g, '').trim() || '';
+
+        cleanTitle = rawTitle
+          .replace(/\(.*?\)|\[.*?\]/g, '')
+          .replace(/ft\..*|feat\..*|official video|lyric video/gi, '')
+          .trim();
+      } catch {}
+    }
+
+    if (!cleanTitle) {
+      return res.json({ available: false, lyrics: 'Lyrics not available for this track.' });
+    }
 
     // 2. Fetch timestamped synced lyrics from LRCLIB
     const lrcUrl = `https://lrclib.net/api/get?track_name=${encodeURIComponent(cleanTitle)}&artist_name=${encodeURIComponent(artist)}`;
@@ -657,10 +922,24 @@ function ensureYtDlpBinary() {
 // Proactively verify / download yt-dlp in the background
 ensureYtDlpBinary();
 
-function resolveStreamUrl(videoId) {
-  const cached = streamCache.get(videoId);
+async function resolveStreamUrl(videoId) {
+  let targetVideoId = videoId;
+  if (videoId && videoId.startsWith('sp__')) {
+    const parts = videoId.split('__');
+    const songTitle = decodeURIComponent(parts[2] || '');
+    const songArtist = decodeURIComponent(parts[3] || '');
+    const q = `${songTitle} ${songArtist}`.trim();
+    try {
+      const results = await scrapeSearch(q);
+      if (results && results.length > 0 && results[0].id) {
+        targetVideoId = results[0].id;
+      }
+    } catch {}
+  }
+
+  const cached = streamCache.get(targetVideoId);
   if (cached && cached.expiresAt > Date.now()) {
-    return Promise.resolve(cached.url);
+    return cached.url;
   }
 
   return new Promise((resolve, reject) => {
@@ -675,7 +954,7 @@ function resolveStreamUrl(videoId) {
       '--extractor-args', 'youtube:player_client=android,ios,mweb',
       '-f', 'bestaudio/best',
       '--get-url',
-      `https://www.youtube.com/watch?v=${videoId}`
+      `https://www.youtube.com/watch?v=${targetVideoId}`
     ], { timeout: 20000 }, (err, stdout) => {
       if (err) {
         // Fallback: search query resolution
@@ -685,12 +964,15 @@ function resolveStreamUrl(videoId) {
           '--extractor-args', 'youtube:player_client=android,ios,mweb',
           '-f', 'bestaudio/best',
           '--get-url',
-          `ytsearch1:${videoId} audio`
+          `ytsearch1:${targetVideoId} audio`
         ], { timeout: 20000 }, (err2, stdout2) => {
           if (err2) return reject(err2);
           const u2 = (stdout2 || '').trim().split('\n')[0];
           if (!u2 || !u2.startsWith('http')) return reject(new Error('No stream URL extracted'));
-          streamCache.set(videoId, { url: u2, expiresAt: Date.now() + 3600 * 1000 });
+          streamCache.set(targetVideoId, { url: u2, expiresAt: Date.now() + 3600 * 1000 });
+          if (videoId !== targetVideoId) {
+            streamCache.set(videoId, { url: u2, expiresAt: Date.now() + 3600 * 1000 });
+          }
           resolve(u2);
         });
         return;
@@ -698,7 +980,10 @@ function resolveStreamUrl(videoId) {
 
       const u = (stdout || '').trim().split('\n')[0];
       if (!u || !u.startsWith('http')) return reject(new Error('No stream URL extracted'));
-      streamCache.set(videoId, { url: u, expiresAt: Date.now() + 3600 * 1000 });
+      streamCache.set(targetVideoId, { url: u, expiresAt: Date.now() + 3600 * 1000 });
+      if (videoId !== targetVideoId) {
+        streamCache.set(videoId, { url: u, expiresAt: Date.now() + 3600 * 1000 });
+      }
       resolve(u);
     });
   });
@@ -744,10 +1029,31 @@ app.get('/api/stream/:videoId', async (req, res) => {
 // ==========================================
 const jamSessions = new Map();
 
+function generateJamCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 5; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `JAM-${code}`;
+}
+
+function normalizeJamId(id) {
+  if (!id) return '';
+  let clean = id.trim().toUpperCase();
+  if (clean.includes('JAM=')) {
+    clean = clean.split('JAM=')[1].split('&')[0];
+  }
+  if (!clean.startsWith('JAM-') && clean.length === 5) {
+    clean = `JAM-${clean}`;
+  }
+  return clean;
+}
+
 app.post('/api/jam/create', optionalAuth, (req, res) => {
   const hostId = req.user?.sub || req.body?.user_id || `user_${Math.random().toString(36).substring(2, 8)}`;
   const hostName = req.user?.username || req.body?.user_name || 'Host Listener';
-  const jamId = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const jamId = generateJamCode();
 
   const session = {
     id: jamId,
@@ -766,12 +1072,13 @@ app.post('/api/jam/create', optionalAuth, (req, res) => {
     jam_id: jamId,
     host_id: hostId,
     host_name: hostName,
-    share_url: `/jam/${jamId}`
+    share_url: `/?jam=${jamId}`
   });
 });
 
 app.get('/api/jam/:jamId', (req, res) => {
-  const session = jamSessions.get(req.params.jamId.toUpperCase());
+  const jamId = normalizeJamId(req.params.jamId);
+  const session = jamSessions.get(jamId);
   if (!session) return res.status(404).json({ detail: 'Jam session not found or expired' });
 
   res.json({
@@ -801,7 +1108,8 @@ server.on('upgrade', (request, socket, head) => {
 
 wss.on('connection', (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
-  const jamId = url.pathname.split('/').pop().toUpperCase();
+  const rawId = url.pathname.split('/').pop();
+  const jamId = normalizeJamId(rawId);
   const userId = url.searchParams.get('user_id') || `anon_${Math.random().toString(36).substring(2, 6)}`;
   const userName = url.searchParams.get('user_name') || 'Guest Listener';
 
@@ -835,8 +1143,10 @@ wss.on('connection', (ws, req) => {
 
   function getParticipantsList() {
     return Array.from(session.participants.values()).map(p => ({
+      id: p.id,
       user_id: p.id,
       name: p.name,
+      user_name: p.name,
       is_host: p.isHost
     }));
   }
@@ -867,14 +1177,48 @@ wss.on('connection', (ws, req) => {
   ws.on('message', (messageRaw) => {
     try {
       const data = JSON.parse(messageRaw);
-      const action = data.action;
+      const action = data.action || data.type;
 
-      if (action === 'PLAY') {
+      if (action === 'PING') {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'PONG' }));
+        }
+        return;
+      }
+
+      if (action === 'PLAY_TRACK' || action === 'CHANGE_TRACK') {
+        session.isPlaying = true;
+        if (data.track) session.currentTrack = data.track;
+        if (data.queue) session.queue = data.queue;
+        session.currentTime = data.current_time !== undefined ? data.current_time : (data.start_time || data.currentTime || 0);
+        broadcast({
+          type: 'PLAY_TRACK',
+          action: 'CHANGE_TRACK',
+          track: session.currentTrack,
+          queue: session.queue,
+          is_playing: true,
+          current_time: session.currentTime,
+          sender_id: userId
+        });
+      } else if (action === 'TOGGLE_PLAY') {
+        session.isPlaying = data.is_playing !== undefined ? !!data.is_playing : !session.isPlaying;
+        if (data.current_time !== undefined) session.currentTime = data.current_time;
+        if (data.track) session.currentTrack = data.track;
+        broadcast({
+          type: 'TOGGLE_PLAY',
+          action: session.isPlaying ? 'PLAY' : 'PAUSE',
+          track: session.currentTrack,
+          is_playing: session.isPlaying,
+          current_time: session.currentTime,
+          sender_id: userId
+        });
+      } else if (action === 'PLAY') {
         session.isPlaying = true;
         if (data.track) session.currentTrack = data.track;
         if (data.currentTime !== undefined) session.currentTime = data.currentTime;
+        if (data.current_time !== undefined) session.currentTime = data.current_time;
         broadcast({
-          type: 'PLAYBACK_UPDATE',
+          type: 'TOGGLE_PLAY',
           action: 'PLAY',
           track: session.currentTrack,
           is_playing: true,
@@ -884,8 +1228,9 @@ wss.on('connection', (ws, req) => {
       } else if (action === 'PAUSE') {
         session.isPlaying = false;
         if (data.currentTime !== undefined) session.currentTime = data.currentTime;
+        if (data.current_time !== undefined) session.currentTime = data.current_time;
         broadcast({
-          type: 'PLAYBACK_UPDATE',
+          type: 'TOGGLE_PLAY',
           action: 'PAUSE',
           track: session.currentTrack,
           is_playing: false,
@@ -893,31 +1238,21 @@ wss.on('connection', (ws, req) => {
           sender_id: userId
         });
       } else if (action === 'SEEK') {
-        session.currentTime = data.currentTime || 0;
+        session.currentTime = data.current_time !== undefined ? data.current_time : (data.currentTime || 0);
         broadcast({
-          type: 'PLAYBACK_UPDATE',
+          type: 'SEEK',
           action: 'SEEK',
           current_time: session.currentTime,
           is_playing: session.isPlaying,
-          sender_id: userId
-        });
-      } else if (action === 'CHANGE_TRACK') {
-        session.currentTrack = data.track;
-        session.currentTime = 0;
-        session.isPlaying = true;
-        broadcast({
-          type: 'PLAYBACK_UPDATE',
-          action: 'CHANGE_TRACK',
           track: session.currentTrack,
-          current_time: 0,
-          is_playing: true,
           sender_id: userId
         });
       } else if (action === 'REACTION') {
         broadcast({
           type: 'REACTION',
-          emoji: data.emoji || '🔥',
-          user_name: userName,
+          action: 'REACTION',
+          emoji: data.emoji || '❤️',
+          user_name: data.user_name || userName,
           sender_id: userId
         });
       }

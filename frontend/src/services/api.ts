@@ -200,35 +200,30 @@ export const api = {
     const trimmed = input.trim();
     if (!trimmed) return null;
 
-    // 1. Spotify playlist URL or URI
-    // e.g. https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M?si=...
-    // e.g. spotify:playlist:37i9dQZF1DXcBWIGoYBM5M
-    const spotifyMatch = trimmed.match(/spotify(?:\.com)?\/(?:embed\/)?playlist\/([a-zA-Z0-9]{15,30})/) ||
-                         trimmed.match(/spotify:playlist:([a-zA-Z0-9]{15,30})/) ||
-                         trimmed.match(/^spotify:([a-zA-Z0-9]{15,30})$/);
+    // 1. Spotify playlist or album URL / URI (including intl-xx prefixes and albums)
+    const spotifyMatch = trimmed.match(/(?:spotify\.com(?:\/[a-zA-Z]{2}(?:-[a-zA-Z]{2})?)?|spotify:)(?:\/embed)?\/(?:playlist|album)\/([a-zA-Z0-9]{15,35})/i) ||
+                         trimmed.match(/spotify:(?:playlist|album):([a-zA-Z0-9]{15,35})/i) ||
+                         trimmed.match(/^spotify:([a-zA-Z0-9]{15,35})$/i);
     if (spotifyMatch) {
       return `spotify:${spotifyMatch[1]}`;
     }
 
-    // 2. YouTube / YouTube Music playlist URL
+    // 2. HTTP URL parsing
     try {
       if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
         const url = new URL(trimmed);
-        const listParam = url.searchParams.get('list');
-        if (listParam) return listParam;
-
-        // In case Spotify URL had unusual formatting
         if (url.hostname.includes('spotify.com')) {
           const parts = url.pathname.split('/').filter(Boolean);
-          const plIdx = parts.indexOf('playlist');
+          const plIdx = parts.findIndex(p => p === 'playlist' || p === 'album');
           if (plIdx !== -1 && parts[plIdx + 1]) {
-            return `spotify:${parts[plIdx + 1]}`;
+            const rawId = parts[plIdx + 1].split('?')[0];
+            return `spotify:${rawId}`;
           }
         }
+        const listParam = url.searchParams.get('list');
+        if (listParam) return listParam;
       }
-    } catch {
-      // fallback to regex
-    }
+    } catch {}
 
     const ytListMatch = trimmed.match(/[?&]list=([a-zA-Z0-9_-]+)/);
     if (ytListMatch) return ytListMatch[1];
@@ -238,7 +233,7 @@ export const api = {
       return `spotify:${trimmed}`;
     }
 
-    // 4. Raw playlist ID or list without spaces/slashes
+    // 4. Raw YouTube playlist ID
     if (!trimmed.includes('/') && !trimmed.includes('?') && !trimmed.includes(' ') && trimmed.length >= 6) {
       return trimmed;
     }

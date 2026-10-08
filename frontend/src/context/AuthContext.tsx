@@ -15,13 +15,21 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const TOKEN_KEY = 'soundflow_auth_token';
+const USER_KEY = 'soundflow_user_data';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const saved = localStorage.getItem(USER_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Restore session on app load
+  // Restore and validate session on app load
   useEffect(() => {
     const restoreSession = async () => {
       const storedToken = localStorage.getItem(TOKEN_KEY);
@@ -31,12 +39,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       try {
         const data = await api.getMe();
-        setUser(data.user);
-      } catch (err) {
-        console.warn('Session expired or invalid:', err);
-        localStorage.removeItem(TOKEN_KEY);
-        setToken(null);
-        setUser(null);
+        if (data && data.user) {
+          setUser(data.user);
+          localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+        }
+      } catch (err: any) {
+        console.warn('Session verification notice:', err?.message || err);
+        // Only clear credentials if server explicitly denied authorization (401)
+        const isAuthError = err?.message && (
+          err.message.includes('401') ||
+          err.message.includes('Authentication token required') ||
+          err.message.includes('Invalid or expired')
+        );
+        if (isAuthError) {
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(USER_KEY);
+          setToken(null);
+          setUser(null);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -48,6 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (identifier: string, password: string) => {
     const data = await api.login(identifier, password);
     localStorage.setItem(TOKEN_KEY, data.token);
+    localStorage.setItem(USER_KEY, JSON.stringify(data.user));
     setToken(data.token);
     setUser(data.user);
   };
@@ -55,12 +76,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (username: string, email: string, password: string) => {
     const data = await api.register(username, email, password);
     localStorage.setItem(TOKEN_KEY, data.token);
+    localStorage.setItem(USER_KEY, JSON.stringify(data.user));
     setToken(data.token);
     setUser(data.user);
   };
 
   const logout = () => {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
     setToken(null);
     setUser(null);
   };
