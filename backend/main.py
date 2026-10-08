@@ -468,7 +468,8 @@ async def download_apk():
             filename="TidesMusic.apk",
             media_type="application/vnd.android.package-archive"
         )
-    raise HTTPException(status_code=404, detail="APK not found")
+    from starlette.responses import RedirectResponse
+    return RedirectResponse(url="https://github.com/hatimmustafa7869-dot/tidesmusic/releases/download/v1.0.0/TidesMusic.apk")
 
 @app.get("/downloads/TidesMusic-Setup.exe")
 @app.get("/download/pc")

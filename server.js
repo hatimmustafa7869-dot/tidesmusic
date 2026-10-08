@@ -945,8 +945,23 @@ wss.on('connection', (ws, req) => {
 });
 
 // ==========================================
-// 8. SERVE FRONTEND STATIC FILES (SPA)
+// 8. SERVE FRONTEND STATIC FILES & APK DOWNLOADS
 // ==========================================
+// Dedicated APK download endpoint with Android package MIME type
+app.get(['/downloads/TidesMusic.apk', '/download/apk', '/api/download/apk'], (req, res) => {
+  const apkPath = path.join(__dirname, 'frontend', 'dist', 'downloads', 'TidesMusic.apk');
+  const fallbackApkPath = path.join(__dirname, 'frontend', 'public', 'downloads', 'TidesMusic.apk');
+  const fileToServe = fs.existsSync(apkPath) ? apkPath : (fs.existsSync(fallbackApkPath) ? fallbackApkPath : null);
+
+  if (fileToServe) {
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', 'attachment; filename="TidesMusic.apk"');
+    return res.sendFile(fileToServe);
+  }
+  // Redirect to GitHub release CDN if local file is missing
+  return res.redirect('https://github.com/hatimmustafa7869-dot/tidesmusic/releases/download/v1.0.0/TidesMusic.apk');
+});
+
 const distPath = path.join(__dirname, 'frontend', 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
