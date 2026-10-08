@@ -9,12 +9,15 @@
     "desktop": "npx electron ."
   },
   "dependencies": {
+    "@distube/yt-dlp": "^2.0.1",
+    "@distube/ytdl-core": "^4.16.12",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
-    "ws": "^8.18.0"
-  },
-  "devDependencies": {}
+    "play-dl": "^1.9.7",
+    "ws": "^8.18.0",
+    "youtube-sr": "^4.3.12"
+  }
 }

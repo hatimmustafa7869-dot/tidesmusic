@@ -1,7 +1,9 @@
 const express = require('express');
 const http = require('http');
+const https = require('https');
 const path = require('path');
 const fs = require('fs');
+const { execFile } = require('child_process');
 const cors = require('cors');
 const { WebSocketServer, WebSocket } = require('ws');
 const jwt = require('jsonwebtoken');
@@ -302,102 +304,148 @@ app.delete('/api/user/history', authenticateToken, (req, res) => {
 });
 
 // ==========================================
-// 4. MUSIC SEARCH & BROWSING (YouTube Data API v3)
+// 4. MUSIC SEARCH & BROWSING (High-Res Scraper + API Fallback)
 // ==========================================
+async function scrapeSearch(query) {
+  try {
+    const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9'
+      }
+    });
+    const html = await res.text();
+    const startIdx = html.indexOf('var ytInitialData = ');
+    if (startIdx === -1) return [];
+    const jsonStart = startIdx + 'var ytInitialData = '.length;
+    const jsonEnd = html.indexOf(';</script>', jsonStart);
+    if (jsonEnd === -1) return [];
+    const data = JSON.parse(html.substring(jsonStart, jsonEnd));
+    const contents = data.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
+    const items = [];
+    for (const section of contents) {
+      const renderers = section.itemSectionRenderer?.contents || [];
+      for (const r of renderers) {
+        const v = r.videoRenderer;
+        if (v && v.videoId) {
+          const durStr = v.lengthText?.simpleText || '0:00';
+          let durSec = 0;
+          if (durStr) {
+            const parts = durStr.split(':').map(Number);
+            durSec = parts.length === 3 ? parts[0] * 3600 + parts[1] * 60 + parts[2] : (parts[0] || 0) * 60 + (parts[1] || 0);
+          }
+          items.push({
+            id: v.videoId,
+            title: v.title?.runs?.[0]?.text || '',
+            artist: v.ownerText?.runs?.[0]?.text || '',
+            duration: durSec,
+            durationFormatted: durStr,
+            thumbnail: v.thumbnail?.thumbnails?.slice(-1)[0]?.url || '',
+            type: 'song'
+          });
+        }
+      }
+    }
+    return items;
+  } catch (err) {
+    console.error('YouTube scraper error:', err.message);
+    return [];
+  }
+}
+
 app.get('/api/home', async (req, res) => {
+  let trending = [];
+
+  // 1. Try YouTube Data API v3 if quota is available
   try {
     const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&chart=mostPopular&videoCategoryId=10&maxResults=16&key=${YOUTUBE_API_KEY}`;
     const ytRes = await fetch(url);
     const data = await ytRes.json();
+    if (data.items && data.items.length > 0) {
+      trending = data.items.map(item => {
+        const dur = parseIsoDuration(item.contentDetails?.duration);
+        return {
+          id: item.id,
+          title: item.snippet?.title || 'Unknown Title',
+          artist: item.snippet?.channelTitle || 'Artist',
+          thumbnail: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.medium?.url || '',
+          duration: dur,
+          durationFormatted: formatDuration(dur),
+          type: 'song'
+        };
+      });
+    }
+  } catch {}
 
-    const trending = (data.items || []).map(item => {
-      const dur = parseIsoDuration(item.contentDetails?.duration);
-      return {
-        id: item.id,
-        title: item.snippet?.title || 'Unknown Title',
-        artist: item.snippet?.channelTitle || 'Artist',
-        thumbnail: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.medium?.url || '',
-        duration: dur,
-        durationFormatted: formatDuration(dur),
-        type: 'song'
-      };
-    });
-
-    const shelves = [
-      {
-        title: 'Popular Playlists & Mixes',
-        items: [
-          {
-            id: 'RDCLAK5uy_kmPRjFGN7YstCHdnuf3vqKcgG5wNIo',
-            title: "Today's Hits",
-            artist: 'Tides Music',
-            thumbnail: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80',
-            type: 'playlist'
-          },
-          {
-            id: 'RDCLAK5uy_kPX4GZqX9vP9iU8yQkFk0X8hLgK7Fv7eU',
-            title: 'Chill & Lofi Beats',
-            artist: 'Tides Music',
-            thumbnail: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&q=80',
-            type: 'playlist'
-          },
-          {
-            id: 'RDCLAK5uy_n9FBDqV6bF7R7W9nK0oM6pZ3a1kX2j9wE',
-            title: 'Deep Focus',
-            artist: 'Tides Music',
-            thumbnail: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=500&q=80',
-            type: 'playlist'
-          }
-        ]
-      }
-    ];
-
-    res.json({ trending, shelves });
-  } catch (err) {
-    res.json({ trending: [], shelves: [] });
+  // 2. Resilient Fallback: Scrape top hits if quota exceeded or empty
+  if (!trending || trending.length === 0) {
+    trending = await scrapeSearch('top hits trending songs 2026');
+    if (trending.length > 16) trending = trending.slice(0, 16);
   }
+
+  const shelves = [
+    {
+      title: 'Popular Playlists & Mixes',
+      items: [
+        {
+          id: 'RDCLAK5uy_kmPRjFGN7YstCHdnuf3vqKcgG5wNIo',
+          title: "Today's Hits",
+          artist: 'Tides Music',
+          thumbnail: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80',
+          type: 'playlist'
+        },
+        {
+          id: 'RDCLAK5uy_kPX4GZqX9vP9iU8yQkFk0X8hLgK7Fv7eU',
+          title: 'Chill & Lofi Beats',
+          artist: 'Tides Music',
+          thumbnail: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&q=80',
+          type: 'playlist'
+        },
+        {
+          id: 'RDCLAK5uy_n9FBDqV6bF7R7W9nK0oM6pZ3a1kX2j9wE',
+          title: 'Deep Focus',
+          artist: 'Tides Music',
+          thumbnail: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=500&q=80',
+          type: 'playlist'
+        }
+      ]
+    }
+  ];
+
+  res.json({ trending, shelves });
 });
 
 app.get('/api/search', async (req, res) => {
   const query = req.query.q || '';
-  const type = req.query.type || 'all';
   if (!query.trim()) return res.json({ results: [] });
 
+  // 1. Primary: Fast unlimited YouTube web search scraping (0 quota, instant)
+  const scraped = await scrapeSearch(query);
+  if (scraped.length > 0) {
+    return res.json({ results: scraped });
+  }
+
+  // 2. Fallback: YouTube Data API v3 (if key has quota)
   try {
-    const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&maxResults=25&key=${YOUTUBE_API_KEY}`;
+    const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=25&key=${YOUTUBE_API_KEY}`;
     const sRes = await fetch(searchUrl);
     const data = await sRes.json();
-
-    const videoIds = (data.items || []).map(i => i.id?.videoId).filter(Boolean);
-    let durationMap = {};
-
-    if (videoIds.length > 0) {
-      const vUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${videoIds.join(',')}&key=${YOUTUBE_API_KEY}`;
-      const vRes = await fetch(vUrl);
-      const vData = await vRes.json();
-      (vData.items || []).forEach(it => {
-        durationMap[it.id] = parseIsoDuration(it.contentDetails?.duration);
-      });
-    }
-
-    const results = (data.items || []).map(item => {
-      const vid = item.id?.videoId;
-      const dur = durationMap[vid] || 0;
-      return {
-        id: vid,
+    if (data.items && data.items.length > 0) {
+      const results = data.items.map(item => ({
+        id: item.id?.videoId,
         title: item.snippet?.title || '',
         artist: item.snippet?.channelTitle || '',
         thumbnail: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.medium?.url || '',
-        duration: dur,
-        durationFormatted: formatDuration(dur),
         type: 'song'
-      };
-    });
-
-    res.json({ results, nextPageToken: data.nextPageToken });
+      }));
+      return res.json({ results, nextPageToken: data.nextPageToken });
+    }
   } catch (err) {
-    res.status(500).json({ detail: 'Search failed', results: [] });
+    console.error('Search fallback error:', err.message);
   }
+
+  res.json({ results: [] });
 });
 
 app.get('/api/playlist/:id', async (req, res) => {
@@ -544,66 +592,151 @@ app.get('/api/lyrics/:videoId', async (req, res) => {
 });
 
 // ==========================================
-// 6. HIGH-PERFORMANCE AUDIO STREAM PROXY
+// 6. HIGH-PERFORMANCE AUDIO STREAM PROXY (yt-dlp Bot-Bypass Engine)
 // ==========================================
-const INVIDIOUS_INSTANCES = [
-  'https://invidious.jing.rocks',
-  'https://inv.nadeko.net',
-  'https://invidious.nerdvpn.de',
-  'https://vid.puffyan.us'
-];
+const streamCache = new Map(); // videoId -> { url, expiresAt }
+
+function getYtDlpBin() {
+  const isWin = process.platform === 'win32';
+  const candidates = [
+    path.join(__dirname, 'node_modules', '@distube', 'yt-dlp', 'bin', isWin ? 'yt-dlp.exe' : 'yt-dlp'),
+    path.join(__dirname, 'bin', isWin ? 'yt-dlp.exe' : 'yt-dlp'),
+    path.join(__dirname, '.venv', 'Scripts', 'yt-dlp.exe'),
+    isWin ? 'yt-dlp.exe' : 'yt-dlp'
+  ];
+
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return isWin ? 'yt-dlp.exe' : 'yt-dlp';
+}
+
+function ensureYtDlpBinary() {
+  const isWin = process.platform === 'win32';
+  const binDir = path.join(__dirname, 'bin');
+  const targetBin = path.join(binDir, isWin ? 'yt-dlp.exe' : 'yt-dlp');
+
+  if (fs.existsSync(targetBin)) return Promise.resolve(targetBin);
+  const candidate = getYtDlpBin();
+  if (fs.existsSync(candidate)) return Promise.resolve(candidate);
+
+  if (!fs.existsSync(binDir)) {
+    try { fs.mkdirSync(binDir, { recursive: true }); } catch {}
+  }
+
+  const binaryUrl = isWin
+    ? 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe'
+    : 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp';
+
+  return new Promise((resolve) => {
+    function fetchBin(url) {
+      https.get(url, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          return fetchBin(res.headers.location);
+        }
+        if (res.statusCode !== 200) {
+          return resolve(candidate);
+        }
+        const stream = fs.createWriteStream(targetBin);
+        res.pipe(stream);
+        stream.on('finish', () => {
+          stream.close(() => {
+            if (!isWin) {
+              try { fs.chmodSync(targetBin, 0o755); } catch {}
+            }
+            console.log('yt-dlp binary downloaded successfully to:', targetBin);
+            resolve(targetBin);
+          });
+        });
+      }).on('error', () => resolve(candidate));
+    }
+    fetchBin(binaryUrl);
+  });
+}
+
+// Proactively verify / download yt-dlp in the background
+ensureYtDlpBinary();
+
+function resolveStreamUrl(videoId) {
+  const cached = streamCache.get(videoId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return Promise.resolve(cached.url);
+  }
+
+  return new Promise((resolve, reject) => {
+    const bin = getYtDlpBin();
+    if (process.platform !== 'win32' && fs.existsSync(bin)) {
+      try { fs.chmodSync(bin, 0o755); } catch {}
+    }
+
+    execFile(bin, [
+      '--no-warnings',
+      '--no-playlist',
+      '--extractor-args', 'youtube:player_client=android,ios,mweb',
+      '-f', 'bestaudio/best',
+      '--get-url',
+      `https://www.youtube.com/watch?v=${videoId}`
+    ], { timeout: 20000 }, (err, stdout) => {
+      if (err) {
+        // Fallback: search query resolution
+        execFile(bin, [
+          '--no-warnings',
+          '--no-playlist',
+          '--extractor-args', 'youtube:player_client=android,ios,mweb',
+          '-f', 'bestaudio/best',
+          '--get-url',
+          `ytsearch1:${videoId} audio`
+        ], { timeout: 20000 }, (err2, stdout2) => {
+          if (err2) return reject(err2);
+          const u2 = (stdout2 || '').trim().split('\n')[0];
+          if (!u2 || !u2.startsWith('http')) return reject(new Error('No stream URL extracted'));
+          streamCache.set(videoId, { url: u2, expiresAt: Date.now() + 3600 * 1000 });
+          resolve(u2);
+        });
+        return;
+      }
+
+      const u = (stdout || '').trim().split('\n')[0];
+      if (!u || !u.startsWith('http')) return reject(new Error('No stream URL extracted'));
+      streamCache.set(videoId, { url: u, expiresAt: Date.now() + 3600 * 1000 });
+      resolve(u);
+    });
+  });
+}
 
 app.get('/api/stream/:videoId', async (req, res) => {
   const { videoId } = req.params;
 
-  // Try Invidious / Piped instances to fetch high-bitrate direct audio
-  for (const instance of INVIDIOUS_INSTANCES) {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3500);
-      const apiUrl = `${instance}/api/v1/videos/${videoId}`;
-      const response = await fetch(apiUrl, { signal: controller.signal });
-      clearTimeout(timeout);
-
-      if (response.ok) {
-        const data = await response.json();
-        const formats = data.adaptiveFormats || [];
-        const audioFormat = formats
-          .filter(f => f.type && f.type.startsWith('audio/'))
-          .sort((a, b) => (parseInt(b.bitrate) || 0) - (parseInt(a.bitrate) || 0))[0];
-
-        if (audioFormat && audioFormat.url) {
-          // Redirect browser audio element directly to stream with full range support
-          return res.redirect(audioFormat.url);
-        }
-      }
-    } catch {
-      // Continue to next mirror
-    }
-  }
-
-  // Fallback: Cobalt audio extraction
   try {
-    const cobaltRes = await fetch('https://api.cobalt.tools/api/json', {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        url: `https://www.youtube.com/watch?v=${videoId}`,
-        isAudioOnly: true
-      })
-    });
-    if (cobaltRes.ok) {
-      const cData = await cobaltRes.json();
-      if (cData.url) {
-        return res.redirect(cData.url);
-      }
-    }
-  } catch {}
+    const streamUrl = await resolveStreamUrl(videoId);
 
-  res.status(502).json({ detail: 'Failed to resolve audio stream' });
+    // Forward range request to GoogleVideo
+    const headers = {};
+    if (req.headers.range) {
+      headers['Range'] = req.headers.range;
+    }
+    headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+
+    const audioReq = https.get(streamUrl, { headers }, (audioRes) => {
+      res.writeHead(audioRes.statusCode, {
+        'Content-Type': audioRes.headers['content-type'] || 'audio/mp4',
+        'Content-Length': audioRes.headers['content-length'],
+        'Content-Range': audioRes.headers['content-range'],
+        'Accept-Ranges': 'bytes',
+        'Cache-Control': 'public, max-age=3600',
+        'Access-Control-Allow-Origin': '*'
+      });
+      audioRes.pipe(res);
+    });
+
+    audioReq.on('error', (err) => {
+      console.error('Audio stream pipe error:', err.message);
+      if (!res.headersSent) res.status(502).json({ detail: 'Failed to stream audio' });
+    });
+  } catch (err) {
+    console.error('Audio stream error for video', videoId, ':', err.message);
+    res.status(500).json({ detail: 'Failed to resolve audio stream' });
+  }
 });
 
 // ==========================================
