@@ -1,13 +1,20 @@
 {
-  "name": "soundflow-desktop",
+  "name": "tides-music",
   "version": "1.0.0",
-  "description": "Spotify-style Music App with YouTube Music Streaming and Background Playback",
-  "main": "electron/main.cjs",
+  "description": "Tides Music - High-Fidelity Music Streaming Player with Jam Collaborative Listening & Lyrics",
+  "main": "server.js",
   "scripts": {
-    "start": "python run.py",
-    "desktop": "electron ."
+    "start": "node server.js",
+    "build": "npm --prefix frontend install && npm --prefix frontend run build",
+    "desktop": "npx electron ."
   },
-  "devDependencies": {
-    "electron": "^34.2.0"
-  }
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {}
 }
