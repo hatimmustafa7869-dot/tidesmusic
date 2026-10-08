@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   Check,
-  Download,
   HelpCircle,
   Laptop,
   Share2,
@@ -50,7 +49,7 @@ export const DownloadAppModal: React.FC<DownloadAppModalProps> = ({ isOpen, onCl
       }
       setDeferredPrompt(null);
     } else {
-      alert('To install, open your browser menu (⋮ or ...) and tap "Install app" or "Add to Home screen".');
+      alert('To install on your PC, look at the top-right of your browser address bar and click the "Install app" icon (computer monitor with down arrow), or click the 3 dots (⋮) > "Install Tides Music".');
     }
   };
 
@@ -202,31 +201,27 @@ export const DownloadAppModal: React.FC<DownloadAppModalProps> = ({ isOpen, onCl
                 <div className="flex flex-col gap-2 w-full md:w-auto shrink-0">
                   <button
                     onClick={handleInstallPWA}
-                    className="flex items-center justify-center gap-2 px-6 py-3 bg-white hover:bg-zinc-200 hover:scale-105 active:scale-95 text-black font-extrabold text-sm rounded-full transition shadow-lg"
+                    className="flex items-center justify-center gap-2 px-6 py-3 bg-white hover:bg-zinc-200 hover:scale-105 active:scale-95 text-black font-extrabold text-sm rounded-full transition shadow-lg cursor-pointer"
                   >
                     <Laptop className="w-4 h-4 text-blue-600" />
                     <span>Install to PC (Instant)</span>
                   </button>
-
-                  <a
-                    href="/downloads/TidesMusic-Setup.exe"
-                    download="TidesMusic-Setup.exe"
-                    className="flex items-center justify-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white font-semibold text-xs rounded-full transition"
-                  >
-                    <Download className="w-3.5 h-3.5 text-zinc-400" />
-                    <span>Download PC Installer (.exe)</span>
-                  </a>
                 </div>
               </div>
 
-              <div className="bg-[#1b1b1b] border border-white/5 rounded-xl p-4 text-xs text-zinc-400 space-y-2">
-                <p className="font-bold text-white flex items-center gap-1.5">
+              <div className="bg-[#1b1b1b] border border-white/5 rounded-xl p-4 space-y-3 text-xs text-zinc-300">
+                <div className="flex items-center gap-2 font-bold text-white">
                   <Check className="w-4 h-4 text-[#1ed760]" />
-                  Why use Tides Desktop?
-                </p>
-                <p>
-                  No tab clutter, instant lockscreen controls, and runs independently in its own ultra-fast window.
-                </p>
+                  <span>How to install on Windows & Mac:</span>
+                </div>
+                <ol className="text-zinc-400 space-y-1.5 list-decimal list-inside">
+                  <li>Click the white <strong>"Install to PC (Instant)"</strong> button above.</li>
+                  <li>Or look at your browser's address bar in the top-right corner and click the <strong>Install App icon (computer monitor with down arrow)</strong>.</li>
+                  <li>Click <strong>"Install"</strong>. Windows will create a desktop shortcut and open Tides Music in its own dedicated, native desktop window!</li>
+                </ol>
+                <div className="pt-2 border-t border-white/5 text-[11px] text-zinc-500">
+                  ✨ Works with full keyboard media keys (Play/Pause/Next on keyboards and headsets) and taskbar pinning.
+                </div>
               </div>
             </div>
           )}
