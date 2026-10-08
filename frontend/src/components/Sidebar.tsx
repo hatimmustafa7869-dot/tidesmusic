@@ -10,9 +10,11 @@ import {
   List,
   ListMusic,
   Plus,
+  Radio,
   Search,
   X
 } from 'lucide-react';
+import { useJam } from '../context/JamContext';
 import { useLibrary } from '../context/LibraryContext';
 
 interface SidebarProps {
@@ -37,6 +39,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile
 }) => {
   const { playlists, favorites } = useLibrary();
+  const { isJamActive, participants, setIsJamModalOpen } = useJam();
 
   const [activeFilter, setActiveFilter] = useState<'all' | 'playlists' | 'liked'>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -104,6 +107,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <Search className="w-5 h-5 text-[#1ed760]" />
           <span>Search</span>
+        </button>
+        <button
+          onClick={() => {
+            setIsJamModalOpen(true);
+            if (onCloseMobile) onCloseMobile();
+          }}
+          className="flex items-center justify-between px-3 py-2 rounded-lg font-bold text-sm text-zinc-300 hover:text-white hover:bg-white/5 transition"
+        >
+          <div className="flex items-center gap-3">
+            <Radio className="w-5 h-5 text-[#1ed760]" />
+            <span>Spotify Jam</span>
+          </div>
+          {isJamActive ? (
+            <span className="px-2 py-0.5 rounded-full bg-[#1ed760] text-black text-[10px] font-black animate-pulse">
+              LIVE ({participants.length})
+            </span>
+          ) : (
+            <span className="text-[11px] text-zinc-500 font-semibold">Start</span>
+          )}
         </button>
       </div>
 

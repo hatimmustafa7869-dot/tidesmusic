@@ -65,6 +65,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const currentTrackRef = useRef<Track | null>(null);
   const repeatRef = useRef<RepeatMode>('off');
   const stallTimeoutRef = useRef<any>(null);
+  const userExplicitPauseRef = useRef<boolean>(false);
+  const silentAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -111,13 +113,31 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
               // 1: PLAYING
               if (event.data === 1) {
+                userExplicitPauseRef.current = false;
                 setIsPlaying(true);
                 setIsLoading(false);
                 const d = event.target.getDuration();
                 if (d > 0) setDuration(d);
+                if ('mediaSession' in navigator) {
+                  navigator.mediaSession.playbackState = 'playing';
+                }
               } else if (event.data === 2) {
                 // 2: PAUSED
+                // If paused involuntarily because tab went into background / screen locked:
+                if (document.hidden && !userExplicitPauseRef.current) {
+                  setTimeout(() => {
+                    if (!userExplicitPauseRef.current && ytPlayerRef.current) {
+                      try {
+                        ytPlayerRef.current.playVideo();
+                      } catch {}
+                    }
+                  }, 100);
+                  return;
+                }
                 setIsPlaying(false);
+                if ('mediaSession' in navigator) {
+                  navigator.mediaSession.playbackState = 'paused';
+                }
               } else if (event.data === 0) {
                 // 0: ENDED
                 if (repeatRef.current === 'one') {
@@ -287,6 +307,43 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => clearInterval(timer);
   }, []);
 
+  // Keep background audio active on mobile browsers (prevents mobile Chrome from suspending tab)
+  useEffect(() => {
+    if (!silentAudioRef.current) {
+      // 1-second silent WAV data URI
+      const audio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+      audio.loop = true;
+      audio.volume = 0.01;
+      silentAudioRef.current = audio;
+    }
+
+    if (isPlaying) {
+      silentAudioRef.current.play().catch(() => {});
+    } else {
+      silentAudioRef.current.pause();
+    }
+  }, [isPlaying]);
+
+  // Page visibility change handler to prevent background throttling
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        if (currentTrackRef.current && isPlaying && !userExplicitPauseRef.current) {
+          if (activeEngineRef.current === 'yt' && ytPlayerRef.current) {
+            try {
+              ytPlayerRef.current.playVideo();
+            } catch {}
+          }
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [isPlaying]);
+
   // Synchronize MediaSession API for Native Lockscreen and Background Controls
   useEffect(() => {
     if (!currentTrack || !('mediaSession' in navigator)) return;
@@ -304,8 +361,32 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       ],
     });
 
-    navigator.mediaSession.setActionHandler('play', () => togglePlay());
-    navigator.mediaSession.setActionHandler('pause', () => togglePlay());
+    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+
+    navigator.mediaSession.setActionHandler('play', () => {
+      userExplicitPauseRef.current = false;
+      if (activeEngineRef.current === 'yt' && ytPlayerRef.current) {
+        ytPlayerRef.current.playVideo();
+        setIsPlaying(true);
+      } else if (audioRef.current) {
+        audioRef.current.play().catch(console.error);
+        setIsPlaying(true);
+      }
+      navigator.mediaSession.playbackState = 'playing';
+    });
+
+    navigator.mediaSession.setActionHandler('pause', () => {
+      userExplicitPauseRef.current = true;
+      if (activeEngineRef.current === 'yt' && ytPlayerRef.current) {
+        ytPlayerRef.current.pauseVideo();
+        setIsPlaying(false);
+      } else if (audioRef.current) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      }
+      navigator.mediaSession.playbackState = 'paused';
+    });
+
     navigator.mediaSession.setActionHandler('previoustrack', () => prevTrack());
     navigator.mediaSession.setActionHandler('nexttrack', () => nextTrack());
     navigator.mediaSession.setActionHandler('seekto', (details) => {
@@ -318,12 +399,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       seek(Math.min(duration || 9999, currentTime + (details.seekOffset || 10)));
     });
     navigator.mediaSession.setActionHandler('stop', () => {
+      userExplicitPauseRef.current = true;
       if (activeEngineRef.current === 'yt' && ytPlayerRef.current) ytPlayerRef.current.pauseVideo();
       else if (audioRef.current) audioRef.current.pause();
       setIsPlaying(false);
       setCurrentTime(0);
+      navigator.mediaSession.playbackState = 'paused';
     });
-  }, [currentTrack, currentTime, duration]);
+  }, [currentTrack, currentTime, duration, isPlaying]);
 
   // Playback execution via YouTube Engine
   const playWithYouTube = (track: Track, startTime: number = 0) => {
@@ -501,6 +584,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const togglePlay = () => {
     if (!currentTrack) return;
     const nextPlay = !isPlaying;
+    userExplicitPauseRef.current = isPlaying;
 
     if (activeEngineRef.current === 'yt' && ytPlayerRef.current) {
       if (isPlaying) ytPlayerRef.current.pauseVideo();
@@ -509,6 +593,10 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } else if (audioRef.current) {
       if (isPlaying) audioRef.current.pause();
       else audioRef.current.play().catch(console.error);
+    }
+
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = nextPlay ? 'playing' : 'paused';
     }
 
     if (!isSyncingFromRemoteRef.current) {

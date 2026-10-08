@@ -142,11 +142,19 @@ export const Player: React.FC<PlayerProps> = ({
           </div>
         </div>
 
-        {/* Mobile Action Controls: Like, Play/Pause, Next */}
-        <div className="flex items-center gap-1 shrink-0">
+        {/* Mobile Action Controls: Jam, Like, Play/Pause, Next */}
+        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+          <button
+            onClick={() => setIsJamModalOpen(true)}
+            className={`p-1.5 transition ${isJamActive ? 'text-[#1ed760]' : 'text-zinc-400 hover:text-white'}`}
+            title="Start or Join a Jam"
+          >
+            <Radio className="w-4 h-4" />
+          </button>
+
           <button
             onClick={() => toggleFavorite(currentTrack)}
-            className="p-2 transition active:scale-125 text-[#1ed760]"
+            className="p-1.5 transition active:scale-125 text-[#1ed760]"
             title={isFav ? 'Added to Liked Songs' : 'Save to Liked Songs'}
           >
             {isFav ? (
@@ -173,7 +181,7 @@ export const Player: React.FC<PlayerProps> = ({
 
           <button
             onClick={nextTrack}
-            className="p-2 text-zinc-300 hover:text-white transition active:scale-110"
+            className="p-1.5 text-zinc-300 hover:text-white transition active:scale-110"
             title="Next track"
           >
             <SkipForward className="w-5 h-5 fill-current" />

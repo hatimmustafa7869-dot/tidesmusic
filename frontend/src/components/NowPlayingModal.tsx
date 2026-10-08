@@ -12,6 +12,7 @@ import {
   Repeat1,
   RotateCcw,
   RotateCw,
+  Radio,
   Shuffle,
   SkipBack,
   SkipForward,
@@ -20,6 +21,7 @@ import {
   VolumeX
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
+import { useJam } from '../context/JamContext';
 import { useLibrary } from '../context/LibraryContext';
 import { api } from '../services/api';
 
@@ -60,6 +62,7 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({ isOpen, onClos
   } = useAudio();
 
   const { isFavorite, toggleFavorite } = useLibrary();
+  const { isJamActive, participants, setIsJamModalOpen } = useJam();
 
   const [activeTab, setActiveTab] = useState<'lyrics' | 'queue'>('lyrics');
   const [rawLyrics, setRawLyrics] = useState<string>('');
@@ -294,35 +297,51 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({ isOpen, onClos
           </span>
         </div>
 
-        {/* Tab Switcher: Lyrics vs Queue */}
-        <div className="flex items-center gap-1 bg-black/60 p-1 rounded-full border border-white/10 shadow-inner">
+        {/* Tab Switcher & Jam Action */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-black/60 p-1 rounded-full border border-white/10 shadow-inner">
+            <button
+              onClick={() => setActiveTab('lyrics')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 ${
+                activeTab === 'lyrics'
+                  ? 'bg-[#1ed760] text-black shadow-[0_0_15px_rgba(30,215,96,0.35)] scale-102'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <Mic2 className="w-3.5 h-3.5" />
+              Lyrics
+            </button>
+            <button
+              onClick={() => setActiveTab('queue')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 ${
+                activeTab === 'queue'
+                  ? 'bg-[#1ed760] text-black shadow-[0_0_15px_rgba(30,215,96,0.35)] scale-102'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <ListMusic className="w-3.5 h-3.5" />
+              Queue ({queue.length})
+            </button>
+          </div>
+
+          {/* Collaborative Jam Session Button */}
           <button
-            onClick={() => setActiveTab('lyrics')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 ${
-              activeTab === 'lyrics'
-                ? 'bg-[#1ed760] text-black shadow-[0_0_15px_rgba(30,215,96,0.35)] scale-102'
-                : 'text-zinc-400 hover:text-white'
+            onClick={() => setIsJamModalOpen(true)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition ${
+              isJamActive
+                ? 'bg-[#1ed760] text-black shadow-[0_0_12px_rgba(30,215,96,0.5)]'
+                : 'bg-black/60 hover:bg-white/10 text-zinc-300 hover:text-white border border-white/10'
             }`}
+            title={isJamActive ? `In Jam (${participants.length} listeners)` : 'Start or Join a Jam'}
           >
-            <Mic2 className="w-3.5 h-3.5" />
-            Lyrics
-          </button>
-          <button
-            onClick={() => setActiveTab('queue')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 ${
-              activeTab === 'queue'
-                ? 'bg-[#1ed760] text-black shadow-[0_0_15px_rgba(30,215,96,0.35)] scale-102'
-                : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <ListMusic className="w-3.5 h-3.5" />
-            Queue ({queue.length})
+            <Radio className="w-3.5 h-3.5 text-[#1ed760]" />
+            <span>{isJamActive ? `Jam (${participants.length})` : 'Jam'}</span>
           </button>
         </div>
       </div>
 
       {/* 3. Main Split View: Left Column (Art & Controls) + Right Column (Clickable Lyrics / Queue) */}
-      <div className="relative z-10 flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 p-6 md:p-10 lg:p-12 overflow-y-auto max-w-7xl mx-auto w-full items-center">
+      <div className="relative z-10 flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 p-6 md:p-10 lg:p-12 overflow-y-auto overflow-x-hidden max-w-7xl mx-auto w-full items-center">
         {/* LEFT COLUMN: Album Artwork & Comprehensive Playback Controls */}
         <div className="flex flex-col items-center justify-center max-w-md mx-auto w-full space-y-6">
           {/* Cover Art with Vinyl Glow Effect */}

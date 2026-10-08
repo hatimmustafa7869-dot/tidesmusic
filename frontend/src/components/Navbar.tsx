@@ -43,19 +43,19 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [query, setQuery] = useState(initialQuery);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
+  React.useEffect(() => {
+    setQuery(initialQuery);
+  }, [initialQuery]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (query.trim()) {
-      onSearch(query.trim());
-    }
+    onSearch(query.trim());
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setQuery(val);
-    if (val.trim()) {
-      onSearch(val.trim());
-    }
+    onSearch(val.trim());
   };
 
   const initialLetter = user?.username ? user.username.charAt(0).toUpperCase() : 'T';

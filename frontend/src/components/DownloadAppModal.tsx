@@ -18,7 +18,6 @@ export const DownloadAppModal: React.FC<DownloadAppModalProps> = ({ isOpen, onCl
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [activeTab, setActiveTab] = useState<'android' | 'pc' | 'ios'>('android');
-  const [showInstructions, setShowInstructions] = useState(false);
 
   useEffect(() => {
     const handleBeforeInstall = (e: Event) => {
@@ -138,59 +137,47 @@ export const DownloadAppModal: React.FC<DownloadAppModalProps> = ({ isOpen, onCl
                 <div className="space-y-1.5 text-center md:text-left">
                   <div className="flex items-center justify-center md:justify-start gap-2">
                     <span className="text-[10px] font-extrabold uppercase tracking-wider bg-[#1ed760]/20 text-[#1ed760] px-2.5 py-0.5 rounded-full">
-                      Direct APK
+                      Native Web App (PWA)
                     </span>
-                    <span className="text-xs text-zinc-400">v2.4.0 &bull; 320 KB</span>
+                    <span className="text-xs text-zinc-400">Android &bull; 0 Error Install</span>
                   </div>
                   <h3 className="text-lg font-bold text-white">Tides Music for Android</h3>
                   <p className="text-xs text-zinc-400 max-w-sm">
-                    Direct installation package. Runs in background with screen off, headset controls, and zero battery drain.
+                    Installs directly to your home screen & app drawer with lockscreen media controls, background audio, and instant updates.
                   </p>
                 </div>
 
                 <div className="flex flex-col gap-2 w-full md:w-auto shrink-0">
-                  <a
-                    href="/downloads/TidesMusic.apk"
-                    download="TidesMusic.apk"
-                    className="flex items-center justify-center gap-2 px-6 py-3 bg-[#1ed760] hover:bg-[#1fdf64] hover:scale-105 active:scale-95 text-black font-extrabold text-sm rounded-full transition shadow-lg"
+                  <button
+                    onClick={handleInstallPWA}
+                    className="flex items-center justify-center gap-2 px-6 py-3 bg-[#1ed760] hover:bg-[#1fdf64] hover:scale-105 active:scale-95 text-black font-extrabold text-sm rounded-full transition shadow-lg cursor-pointer"
                   >
-                    <Download className="w-4 h-4" />
-                    <span>Download APK</span>
-                  </a>
-
-                  {deferredPrompt && (
-                    <button
-                      onClick={handleInstallPWA}
-                      className="flex items-center justify-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white font-semibold text-xs rounded-full transition"
-                    >
-                      <Smartphone className="w-3.5 h-3.5 text-[#1ed760]" />
-                      <span>Install as Web App</span>
-                    </button>
-                  )}
+                    <Smartphone className="w-4 h-4" />
+                    <span>Install App on Phone</span>
+                  </button>
                 </div>
               </div>
 
-              {/* APK Installation Steps Accordion */}
-              <div className="bg-[#1b1b1b] border border-white/5 rounded-xl p-4 space-y-2.5">
-                <div
-                  onClick={() => setShowInstructions(!showInstructions)}
-                  className="flex items-center justify-between cursor-pointer text-xs font-bold text-zinc-300 hover:text-white"
-                >
-                  <span className="flex items-center gap-2">
-                    <HelpCircle className="w-4 h-4 text-[#1ed760]" />
-                    How to install the APK on your phone
-                  </span>
-                  <span className="text-xs text-zinc-500">{showInstructions ? 'Hide' : 'Show steps'}</span>
+              {/* Step-by-Step Installation Guide */}
+              <div className="bg-[#1b1b1b] border border-white/5 rounded-xl p-4 space-y-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-zinc-200">
+                  <HelpCircle className="w-4 h-4 text-[#1ed760]" />
+                  <span>How to install on any Android phone (Chrome / Samsung / Brave)</span>
                 </div>
-
-                {showInstructions && (
-                  <ol className="text-xs text-zinc-400 space-y-1.5 list-decimal list-inside pt-2 border-t border-white/5">
-                    <li>Tap the <strong>Download APK</strong> button above to download <code className="text-white bg-black/40 px-1 rounded">TidesMusic.apk</code>.</li>
-                    <li>Open your phone's <strong>Downloads</strong> or notification panel and tap the downloaded file.</li>
-                    <li>If Android asks for permission, tap <strong>Settings</strong> and enable <em>"Allow from this source"</em>.</li>
-                    <li>Tap <strong>Install</strong>. Once done, open Tides Music from your home screen!</li>
-                  </ol>
-                )}
+                <ol className="text-xs text-zinc-400 space-y-2 list-decimal list-inside pt-1">
+                  <li>Tap the green <strong>"Install App on Phone"</strong> button above.</li>
+                  <li>Or tap the <strong>3 dots (⋮)</strong> in the top-right corner of Chrome / your mobile browser.</li>
+                  <li>Tap <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong>.</li>
+                  <li>Confirm <strong>"Install"</strong>. Android will create the official app on your home screen with the Tides logo!</li>
+                </ol>
+                <div className="pt-2.5 border-t border-white/5 text-[11px] text-zinc-400 bg-white/5 p-2.5 rounded-lg space-y-1">
+                  <div className="text-white font-bold flex items-center gap-1.5">
+                    <span>⚡ Uninterrupted Background Playback on Android:</span>
+                  </div>
+                  <p>
+                    Go to your phone's <strong>Settings &gt; Apps &gt; Chrome (or Tides Music) &gt; Battery</strong>, and set it to <strong>"Unrestricted"</strong> so Android doesn't pause the music when your screen is locked.
+                  </p>
+                </div>
               </div>
             </div>
           )}

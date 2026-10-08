@@ -39,16 +39,20 @@ export const SearchPage: React.FC<SearchPageProps> = ({
   };
 
   useEffect(() => {
-    if (initialQuery) {
-      setQuery(initialQuery);
-      executeSearch(initialQuery, filter);
+    setQuery(initialQuery);
+    if (initialQuery.trim()) {
+      executeSearch(initialQuery.trim(), filter);
+    } else {
+      setResults([]);
+      setError('');
+      setLoading(false);
     }
   }, [initialQuery]);
 
   const handleFilterChange = (newFilter: 'all' | 'songs' | 'playlists') => {
     setFilter(newFilter);
-    if (query) {
-      executeSearch(query, newFilter);
+    if (query.trim()) {
+      executeSearch(query.trim(), newFilter);
     }
   };
 
