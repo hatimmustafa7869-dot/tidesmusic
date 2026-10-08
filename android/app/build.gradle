@@ -18,11 +18,12 @@ android {
 
     signingConfigs {
         release {
-            // Using standard Android signing key so release builds work seamlessly
-            storeFile file("release.keystore")
-            storePassword "android"
-            keyAlias "androidreleasekey"
-            keyPassword "android"
+            if (file("release.keystore").exists()) {
+                storeFile file("release.keystore")
+                storePassword "android"
+                keyAlias "androidreleasekey"
+                keyPassword "android"
+            }
         }
     }
 
@@ -30,7 +31,11 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            if (file("release.keystore").exists()) {
+                signingConfig signingConfigs.release
+            } else {
+                signingConfig signingConfigs.debug
+            }
         }
         debug {
             applicationIdSuffix ""
