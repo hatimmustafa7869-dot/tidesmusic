@@ -4,6 +4,7 @@ import {
   ArrowDownCircle,
   Download,
   Heart,
+  Home,
   LayoutGrid,
   Library,
   List,
@@ -44,7 +45,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [filterQuery, setFilterQuery] = useState('');
 
   const handleNav = (view: string, data?: any) => {
-    onNavigate(view, data);
+    if (view === 'library') {
+      onNavigate('favorites', data);
+    } else {
+      onNavigate(view, data);
+    }
     if (onCloseMobile) onCloseMobile();
   };
 
@@ -80,10 +85,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const sidebarContent = (
     <div className="flex flex-col h-full bg-[#121212] rounded-lg select-none text-[#b3b3b3] p-3 overflow-hidden border border-white/5">
+      {/* Mobile Top Navigation Links */}
+      <div className="md:hidden flex flex-col gap-1 pb-3 mb-2 border-b border-white/5">
+        <button
+          onClick={() => handleNav('home')}
+          className={`flex items-center gap-3 px-3 py-2 rounded-lg font-bold text-sm transition ${
+            currentView === 'home' ? 'bg-[#282828] text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Home className="w-5 h-5 text-[#1ed760]" />
+          <span>Home</span>
+        </button>
+        <button
+          onClick={() => handleNav('search')}
+          className={`flex items-center gap-3 px-3 py-2 rounded-lg font-bold text-sm transition ${
+            currentView === 'search' ? 'bg-[#282828] text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Search className="w-5 h-5 text-[#1ed760]" />
+          <span>Search</span>
+        </button>
+      </div>
+
       {/* Top Header: "Your Library" */}
       <div className="flex items-center justify-between px-2 py-1 mb-2">
         <button
-          onClick={() => handleNav('library')}
+          onClick={() => handleNav('favorites')}
           className="flex items-center gap-2.5 text-base font-bold text-[#b3b3b3] hover:text-white transition group"
         >
           <Library className="w-6 h-6 text-zinc-400 group-hover:text-white transition" />
@@ -105,6 +132,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <Plus className="w-5 h-5" />
           </button>
+          {onCloseMobile && (
+            <button
+              onClick={onCloseMobile}
+              title="Close Menu"
+              className="md:hidden p-1.5 text-zinc-400 hover:text-white hover:bg-white/10 rounded-full transition ml-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </div>
 

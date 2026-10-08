@@ -39,18 +39,18 @@ export const TrackRow: React.FC<TrackRowProps> = ({
   return (
     <div
       onDoubleClick={handlePlay}
-      className={`group relative flex items-center justify-between px-4 py-2 rounded-md transition select-none ${
+      className={`group relative flex items-center justify-between px-2.5 sm:px-4 py-2 rounded-md transition select-none ${
         isCurrent ? 'bg-[#282828]/70' : 'hover:bg-[#2a2a2a]/50'
       }`}
     >
-      <div className="flex items-center gap-4 min-w-0 flex-1">
+      <div className="flex items-center gap-2.5 sm:gap-4 min-w-0 flex-1">
         {/* Track Number / Play Icon / Equalizer */}
-        <div className="w-5 text-center flex items-center justify-center shrink-0">
+        <div className="w-4 sm:w-5 text-center flex items-center justify-center shrink-0">
           {isCurrent && isPlaying ? (
             <Equalizer isPlaying={true} className="w-3.5 h-3.5" barColor="bg-[#1ed760]" />
           ) : (
             <>
-              <span className={`text-sm group-hover:hidden font-mono ${isCurrent ? 'text-[#1ed760]' : 'text-[#b3b3b3]'}`}>
+              <span className={`text-xs sm:text-sm group-hover:hidden font-mono ${isCurrent ? 'text-[#1ed760]' : 'text-[#b3b3b3]'}`}>
                 {index + 1}
               </span>
               <button
@@ -77,7 +77,7 @@ export const TrackRow: React.FC<TrackRowProps> = ({
         </div>
 
         {/* Title & Artist */}
-        <div className="min-w-0 flex-1 pr-4">
+        <div className="min-w-0 flex-1 pr-2 sm:pr-4">
           <div
             onClick={handlePlay}
             className={`text-sm truncate cursor-pointer hover:underline ${
@@ -93,7 +93,7 @@ export const TrackRow: React.FC<TrackRowProps> = ({
       </div>
 
       {/* Right: Heart, Duration, 3-dots */}
-      <div className="flex items-center gap-4 shrink-0">
+      <div className="flex items-center gap-2 sm:gap-4 shrink-0">
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -102,14 +102,14 @@ export const TrackRow: React.FC<TrackRowProps> = ({
           className={`p-1 transition ${
             isFav
               ? 'text-[#1ed760]'
-              : 'text-[#b3b3b3] hover:text-white opacity-0 group-hover:opacity-100'
+              : 'text-[#b3b3b3] hover:text-white opacity-80 sm:opacity-0 sm:group-hover:opacity-100'
           }`}
           title={isFav ? 'Remove from Liked Songs' : 'Save to Liked Songs'}
         >
           <Heart className={`w-4 h-4 ${isFav ? 'fill-current' : ''}`} />
         </button>
 
-        <span className="text-xs text-[#b3b3b3] font-mono w-10 text-right">
+        <span className="text-xs text-[#b3b3b3] font-mono w-9 sm:w-10 text-right">
           {track.durationFormatted || '3:30'}
         </span>
 
@@ -120,7 +120,7 @@ export const TrackRow: React.FC<TrackRowProps> = ({
               e.stopPropagation();
               setShowMenu(!showMenu);
             }}
-            className="p-1 text-[#b3b3b3] hover:text-white transition opacity-0 group-hover:opacity-100"
+            className="p-1 text-[#b3b3b3] hover:text-white transition opacity-80 sm:opacity-0 sm:group-hover:opacity-100"
           >
             <MoreHorizontal className="w-5 h-5" />
           </button>

@@ -61,12 +61,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   const initialLetter = user?.username ? user.username.charAt(0).toUpperCase() : 'T';
 
   return (
-    <header className="h-14 px-4 flex items-center justify-between gap-4 select-none shrink-0 bg-black text-white">
-      {/* Left: Tides Logo & Navigation History Arrows */}
-      <div className="flex items-center gap-2.5">
+    <header className="h-14 px-2 sm:px-4 flex items-center justify-between gap-2 sm:gap-4 select-none shrink-0 bg-black text-white">
+      {/* Left: Mobile Library Menu & Brand Logo & Navigation History Arrows */}
+      <div className="flex items-center gap-1 sm:gap-2.5 shrink-0">
+        {/* Mobile Library Menu Toggle */}
         <button
           onClick={onOpenMobileMenu}
-          className="md:hidden p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-white/10"
+          className="md:hidden p-1.5 text-zinc-300 hover:text-white rounded-lg hover:bg-white/10 active:scale-95 transition"
           title="Open Library Menu"
         >
           <img src="/logo.png" alt="Tides" className="w-7 h-7 rounded-lg object-cover shadow" />
@@ -88,7 +89,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        {/* Desktop History Navigation Arrows (Hidden on mobile) */}
+        <div className="hidden md:flex items-center gap-1.5">
           <button
             onClick={onGoBack}
             disabled={!canGoBack}
@@ -117,28 +119,28 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Center: Home Button & Spotify Search Pill */}
-      <div className="flex items-center gap-2 flex-1 max-w-[540px] justify-center">
-        {/* Round Home Button */}
+      <div className="flex items-center gap-2 flex-1 min-w-0 max-w-[540px] justify-center">
+        {/* Desktop Round Home Button (Hidden on mobile to provide maximum space for search) */}
         <button
           onClick={onNavigateHome}
-          className="w-12 h-12 rounded-full bg-[#1f1f1f] hover:bg-[#282828] hover:scale-105 active:scale-95 text-white flex items-center justify-center transition shadow shrink-0"
+          className="hidden md:flex w-12 h-12 rounded-full bg-[#1f1f1f] hover:bg-[#282828] hover:scale-105 active:scale-95 text-white items-center justify-center transition shadow shrink-0"
           title="Home"
         >
           <Home className="w-5 h-5 fill-current" />
         </button>
 
-        {/* Unified Search Pill */}
+        {/* Spacious Responsive Search Bar */}
         <form
           onSubmit={handleSubmit}
-          className="relative flex-1 flex items-center bg-[#1f1f1f] hover:bg-[#282828] focus-within:bg-[#1f1f1f] focus-within:border-white/40 border border-transparent rounded-full px-3.5 py-2.5 transition duration-200"
+          className="relative flex-1 min-w-0 flex items-center bg-[#1f1f1f] hover:bg-[#282828] focus-within:bg-[#242424] focus-within:border-white/30 border border-transparent rounded-full px-3 sm:px-3.5 py-1.5 sm:py-2.5 transition duration-200"
         >
-          <Search className="w-5 h-5 text-zinc-400 shrink-0 mr-2" />
+          <Search className="w-4 h-4 sm:w-5 sm:h-5 text-zinc-400 shrink-0 mr-2" />
           <input
             type="text"
             value={query}
             onChange={handleInputChange}
-            placeholder="What do you want to play?"
-            className="w-full bg-transparent text-sm text-white placeholder-zinc-400 focus:outline-none"
+            placeholder="Search songs, artists..."
+            className="w-full min-w-0 bg-transparent text-xs sm:text-sm text-white placeholder-zinc-400 focus:outline-none"
           />
 
           {query && (
@@ -148,7 +150,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                 setQuery('');
                 onSearch('');
               }}
-              className="text-zinc-400 hover:text-white ml-1 p-0.5"
+              className="text-zinc-400 hover:text-white ml-1 p-0.5 shrink-0"
+              title="Clear search"
             >
               <X className="w-4 h-4" />
             </button>
@@ -157,14 +160,14 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Right: Download App, Import & Profile / Auth */}
-      <div className="flex items-center gap-2.5 sm:gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
         {/* Download App Action Button */}
         <button
           onClick={onOpenDownloadApp}
           title="Download Tides Music App (APK & PC)"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#1ed760]/10 hover:bg-[#1ed760]/20 border border-[#1ed760]/30 text-[#1ed760] hover:text-white text-xs font-bold transition hover:scale-105 active:scale-95 shadow-sm"
+          className="flex items-center gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-full bg-[#1ed760]/10 hover:bg-[#1ed760]/20 border border-[#1ed760]/30 text-[#1ed760] hover:text-white text-xs font-bold transition hover:scale-105 active:scale-95 shadow-sm shrink-0"
         >
-          <ArrowDownCircle className="w-4 h-4" />
+          <ArrowDownCircle className="w-4 h-4 shrink-0" />
           <span className="hidden sm:inline">Download App</span>
         </button>
 
@@ -214,10 +217,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               onClick={() => onOpenAuth('login')}
-              className="px-4 py-1.5 rounded-full bg-white hover:bg-zinc-200 text-black font-extrabold text-xs tracking-wider transition hover:scale-105 shadow"
+              className="px-2.5 sm:px-4 py-1.5 rounded-full bg-white hover:bg-zinc-200 text-black font-extrabold text-xs tracking-wider transition hover:scale-105 shadow shrink-0"
             >
               Log in
             </button>
