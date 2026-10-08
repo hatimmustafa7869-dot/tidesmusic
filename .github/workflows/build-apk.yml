@@ -1,0 +1,89 @@
+name: Build Tides Music Android APK
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'android/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Release Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Generate Release Keystore
+        run: |
+          keytool -genkeypair -v \
+            -keystore android/app/release.keystore \
+            -alias androidreleasekey \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass android \
+            -keypass android \
+            -dname "CN=TidesMusic, OU=Mobile, O=TidesMusic, L=US, ST=US, C=US"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build Android Release APK
+        working-directory: android
+        run: |
+          gradle assembleRelease --stacktrace
+
+      - name: Prepare APK Output
+        run: |
+          mkdir -p output
+          cp android/app/build/outputs/apk/release/app-release.apk output/TidesMusic.apk
+          ls -lh output/TidesMusic.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TidesMusic-Android-APK
+          path: output/TidesMusic.apk
+          if-no-files-found: error
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          tag_name: v1.0.0
+          name: "Tides Music Android App v1.0.0"
+          body: |
+            ## 🌊 Tides Music Official Android Application
+            
+            ### ✨ Features:
+            - **True Native Background Playback**: Music never stops when your screen is locked or when switching between apps.
+            - **Lockscreen & Notification Controls**: Play, Pause, Next, and Previous directly from your Android notification drawer and lockscreen with live album artwork.
+            - **Optimized for Android**: Lightweight, battery-friendly foreground media service with hardware headset and Bluetooth car stereo controls.
+            - **Full Feature Sync**: Instant search, Jams, playlists, liked songs, and synced queue.
+            
+            ### 📲 Installation:
+            1. Download `TidesMusic.apk` below.
+            2. Tap the downloaded file and select **"Install"**. (If prompted, allow "Install unknown apps" for your browser).
+            3. Enjoy unlimited background music!
+          files: output/TidesMusic.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

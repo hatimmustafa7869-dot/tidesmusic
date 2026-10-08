@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Check,
+  Download,
   HelpCircle,
   Laptop,
   Share2,
@@ -132,27 +133,36 @@ export const DownloadAppModal: React.FC<DownloadAppModalProps> = ({ isOpen, onCl
           {/* TAB 1: ANDROID */}
           {activeTab === 'android' && (
             <div className="space-y-4">
-              <div className="bg-[#202020] border border-white/5 rounded-xl p-5 flex flex-col md:flex-row items-center justify-between gap-5">
+              {/* PRIMARY: Official Native APK */}
+              <div className="bg-gradient-to-r from-[#1b2b1e] to-[#202020] border border-[#1ed760]/30 rounded-xl p-5 flex flex-col md:flex-row items-center justify-between gap-5 shadow-lg">
                 <div className="space-y-1.5 text-center md:text-left">
                   <div className="flex items-center justify-center md:justify-start gap-2">
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider bg-[#1ed760]/20 text-[#1ed760] px-2.5 py-0.5 rounded-full">
-                      Native Web App (PWA)
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider bg-[#1ed760] text-black px-2.5 py-0.5 rounded-full">
+                      Official Android App (APK)
                     </span>
-                    <span className="text-xs text-zinc-400">Android &bull; 0 Error Install</span>
+                    <span className="text-xs text-[#1ed760] font-semibold">Recommended for Phone</span>
                   </div>
-                  <h3 className="text-lg font-bold text-white">Tides Music for Android</h3>
-                  <p className="text-xs text-zinc-400 max-w-sm">
-                    Installs directly to your home screen & app drawer with lockscreen media controls, background audio, and instant updates.
+                  <h3 className="text-lg font-bold text-white">Tides Music APK (True Background Playback)</h3>
+                  <p className="text-xs text-zinc-300 max-w-sm">
+                    Native Android app with an OS-level Foreground Audio Service. Music continues playing uninterrupted when your screen is locked or while using other apps.
                   </p>
                 </div>
 
                 <div className="flex flex-col gap-2 w-full md:w-auto shrink-0">
+                  <a
+                    href="https://github.com/hatimmustafa7869-dot/tidesmusic/releases/download/v1.0.0/TidesMusic.apk"
+                    download="TidesMusic.apk"
+                    className="flex items-center justify-center gap-2 px-6 py-3 bg-[#1ed760] hover:bg-[#1fdf64] hover:scale-105 active:scale-95 text-black font-extrabold text-sm rounded-full transition shadow-lg cursor-pointer text-center"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download APK (Direct)</span>
+                  </a>
                   <button
                     onClick={handleInstallPWA}
-                    className="flex items-center justify-center gap-2 px-6 py-3 bg-[#1ed760] hover:bg-[#1fdf64] hover:scale-105 active:scale-95 text-black font-extrabold text-sm rounded-full transition shadow-lg cursor-pointer"
+                    className="flex items-center justify-center gap-1.5 px-4 py-2 bg-white/10 hover:bg-white/15 text-zinc-300 hover:text-white font-medium text-xs rounded-full transition text-center"
                   >
-                    <Smartphone className="w-4 h-4" />
-                    <span>Install App on Phone</span>
+                    <Smartphone className="w-3.5 h-3.5" />
+                    <span>Or Install as Web App</span>
                   </button>
                 </div>
               </div>
@@ -161,20 +171,20 @@ export const DownloadAppModal: React.FC<DownloadAppModalProps> = ({ isOpen, onCl
               <div className="bg-[#1b1b1b] border border-white/5 rounded-xl p-4 space-y-3">
                 <div className="flex items-center gap-2 text-xs font-bold text-zinc-200">
                   <HelpCircle className="w-4 h-4 text-[#1ed760]" />
-                  <span>How to install on any Android phone (Chrome / Samsung / Brave)</span>
+                  <span>How to install the APK on your Android phone:</span>
                 </div>
                 <ol className="text-xs text-zinc-400 space-y-2 list-decimal list-inside pt-1">
-                  <li>Tap the green <strong>"Install App on Phone"</strong> button above.</li>
-                  <li>Or tap the <strong>3 dots (⋮)</strong> in the top-right corner of Chrome / your mobile browser.</li>
-                  <li>Tap <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong>.</li>
-                  <li>Confirm <strong>"Install"</strong>. Android will create the official app on your home screen with the Tides logo!</li>
+                  <li>Tap the green <strong>"Download APK (Direct)"</strong> button above.</li>
+                  <li>When downloaded, open the notification or find <strong>TidesMusic.apk</strong> in your Downloads folder.</li>
+                  <li>Tap <strong>"Install"</strong>. (If Android prompts, tap <em>Settings &gt; Allow from this source</em>).</li>
+                  <li>Open Tides Music — enjoy unlimited background music with lockscreen controls!</li>
                 </ol>
                 <div className="pt-2.5 border-t border-white/5 text-[11px] text-zinc-400 bg-white/5 p-2.5 rounded-lg space-y-1">
                   <div className="text-white font-bold flex items-center gap-1.5">
-                    <span>⚡ Uninterrupted Background Playback on Android:</span>
+                    <span>⚡ Why the APK is best for Android:</span>
                   </div>
                   <p>
-                    Go to your phone's <strong>Settings &gt; Apps &gt; Chrome (or Tides Music) &gt; Battery</strong>, and set it to <strong>"Unrestricted"</strong> so Android doesn't pause the music when your screen is locked.
+                    Unlike mobile web browsers which freeze audio when your phone screen turns off, the Tides Music APK uses a native Android Foreground Audio Service that keeps the music playing smoothly without stopping.
                   </p>
                 </div>
               </div>

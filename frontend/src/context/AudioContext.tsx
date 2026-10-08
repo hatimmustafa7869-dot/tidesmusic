@@ -408,6 +408,63 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   }, [currentTrack, currentTime, duration, isPlaying]);
 
+  // Synchronize Android Native App Foreground Service Bridge
+  useEffect(() => {
+    const androidBridge = (window as any).AndroidBridge;
+    if (androidBridge && currentTrack) {
+      try {
+        androidBridge.onTrackChange(
+          currentTrack.title,
+          currentTrack.artist || 'Unknown Artist',
+          currentTrack.thumbnail || '',
+          isPlaying
+        );
+      } catch (err) {
+        console.warn('AndroidBridge track update error:', err);
+      }
+    }
+  }, [currentTrack, isPlaying]);
+
+  // Expose global controls for Android Native Bridge
+  useEffect(() => {
+    (window as any).AndroidControls = {
+      play: () => {
+        userExplicitPauseRef.current = false;
+        if (activeEngineRef.current === 'yt' && ytPlayerRef.current) {
+          ytPlayerRef.current.playVideo();
+        } else if (audioRef.current) {
+          audioRef.current.play().catch(console.error);
+        }
+        setIsPlaying(true);
+      },
+      pause: () => {
+        userExplicitPauseRef.current = true;
+        if (activeEngineRef.current === 'yt' && ytPlayerRef.current) {
+          ytPlayerRef.current.pauseVideo();
+        } else if (audioRef.current) {
+          audioRef.current.pause();
+        }
+        setIsPlaying(false);
+      },
+      next: () => nextTrack(),
+      prev: () => prevTrack(),
+      seek: (sec: number) => seek(sec)
+    };
+
+    const handleNativeControl = (e: any) => {
+      const action = e.detail?.action;
+      if (action === 'play') (window as any).AndroidControls?.play();
+      else if (action === 'pause') (window as any).AndroidControls?.pause();
+      else if (action === 'next') nextTrack();
+      else if (action === 'prev') prevTrack();
+    };
+
+    window.addEventListener('nativeMediaControl', handleNativeControl);
+    return () => {
+      window.removeEventListener('nativeMediaControl', handleNativeControl);
+    };
+  }, [currentTrack, queue, queueIndex]);
+
   // Playback execution via YouTube Engine
   const playWithYouTube = (track: Track, startTime: number = 0) => {
     activeEngineRef.current = 'yt';
