@@ -11,6 +11,14 @@ require('dotenv').config();
 const app = express();
 const server = http.createServer(app);
 
+// Global Error Handlers
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err.stack || err.message);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 // Configuration
 const PORT = process.env.PORT || 8000;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -818,7 +826,19 @@ if (fs.existsSync(distPath)) {
   });
 }
 
-// Start Server
-server.listen(PORT, HOST, () => {
-  console.log(`🌊 Tides Music Server is running on http://${HOST}:${PORT}`);
+// Health check endpoint for hostinger & uptime monitors
+app.get(['/health', '/api/health'], (req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime() });
 });
+
+// Start Server
+if (typeof PhusionPassenger !== 'undefined') {
+  server.listen('passenger');
+} else {
+  const port = process.env.PORT || 8000;
+  server.listen(port, () => {
+    console.log(`🌊 Tides Music Server is running on port ${port}`);
+  });
+}
+
+module.exports = app;
