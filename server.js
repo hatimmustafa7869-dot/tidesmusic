@@ -29,7 +29,8 @@ const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || 'AIzaSyBD3kLZd4PMOhNKS0k6
 const DB_FILE = path.join(__dirname, 'tides_data.json');
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 // In-Memory & File-backed Database
 let db = {
@@ -661,7 +662,7 @@ async function scrapeSpotifyPlaylist(spotifyInput) {
   return parseSpotifyEmbedHtml(html, cleanId);
 }
 
-async function scrapeYouTubePlaylist(playlistId) {
+async function scrapeYouTubePlaylist(playlistId, maxTracks = 1500) {
   let cleanId = playlistId.trim();
   if (cleanId.includes('list=')) {
     cleanId = cleanId.split('list=')[1].split('&')[0];
@@ -691,6 +692,11 @@ async function scrapeYouTubePlaylist(playlistId) {
   }
   const data = JSON.parse(html.substring(jsonStart, jsonEnd));
 
+  const keyMatch = html.match(/"INNERTUBE_API_KEY":\s*"([^"]+)"/);
+  const clientVersionMatch = html.match(/"INNERTUBE_CLIENT_VERSION":\s*"([^"]+)"/);
+  const apiKey = keyMatch ? keyMatch[1] : 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
+  const clientVer = clientVersionMatch ? clientVersionMatch[1] : '2.20261009.01.00';
+
   const title = data.metadata?.playlistMetadataRenderer?.title ||
                 data.microformat?.microformatDataRenderer?.title ||
                 'YouTube Playlist';
@@ -701,7 +707,7 @@ async function scrapeYouTubePlaylist(playlistId) {
   const tracks = [];
   const contents = data.contents?.twoColumnBrowseResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents?.[0]?.itemSectionRenderer?.contents || [];
 
-  for (const item of contents) {
+  function parseTrackItem(item) {
     if (item.playlistVideoRenderer) {
       const v = item.playlistVideoRenderer;
       if (v.videoId) {
@@ -711,7 +717,7 @@ async function scrapeYouTubePlaylist(playlistId) {
           const parts = durStr.split(':').map(Number);
           durSec = parts.length === 3 ? parts[0] * 3600 + parts[1] * 60 + parts[2] : (parts[0] || 0) * 60 + (parts[1] || 0);
         }
-        tracks.push({
+        return {
           id: v.videoId,
           title: v.title?.runs?.[0]?.text || v.title?.simpleText || 'Unknown Song',
           artist: v.shortBylineText?.runs?.[0]?.text || 'Unknown Artist',
@@ -719,7 +725,7 @@ async function scrapeYouTubePlaylist(playlistId) {
           duration: durSec,
           durationFormatted: durStr,
           type: 'song'
-        });
+        };
       }
     } else if (item.lockupViewModel) {
       const v = item.lockupViewModel;
@@ -741,7 +747,7 @@ async function scrapeYouTubePlaylist(playlistId) {
           durFormatted = `${m}:${s < 10 ? '0' : ''}${s}`;
         }
 
-        tracks.push({
+        return {
           id: vid,
           title: songTitle,
           artist,
@@ -749,8 +755,77 @@ async function scrapeYouTubePlaylist(playlistId) {
           duration: durSec,
           durationFormatted: durFormatted,
           type: 'song'
-        });
+        };
       }
+    }
+    return null;
+  }
+
+  function getContinuationToken(items) {
+    if (!Array.isArray(items) || items.length === 0) return null;
+    const lastItem = items[items.length - 1];
+    return lastItem?.continuationItemViewModel?.continuationCommand?.innertubeCommand?.continuationCommand?.token ||
+           lastItem?.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token ||
+           null;
+  }
+
+  // Parse page 1 items
+  for (const item of contents) {
+    const t = parseTrackItem(item);
+    if (t) tracks.push(t);
+  }
+
+  let continuationToken = getContinuationToken(contents);
+  let page = 1;
+
+  // Paginate through remaining batches up to maxTracks (supports 500, 1000+ songs)
+  while (continuationToken && tracks.length < maxTracks) {
+    page++;
+    try {
+      const browseRes = await fetch(`https://www.youtube.com/youtubei/v1/browse?key=${apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        },
+        body: JSON.stringify({
+          context: {
+            client: {
+              clientName: 'WEB',
+              clientVersion: clientVer,
+              hl: 'en',
+              gl: 'US'
+            }
+          },
+          continuation: continuationToken
+        })
+      });
+
+      if (!browseRes.ok) {
+        console.warn(`[Playlist Scraper] Continuation page ${page} returned HTTP ${browseRes.status}`);
+        break;
+      }
+
+      const browseData = await browseRes.json();
+      const actions = browseData.onResponseReceivedActions || [];
+      const continuationItems = actions[0]?.appendContinuationItemsAction?.continuationItems || [];
+
+      if (continuationItems.length === 0) break;
+
+      let addedThisPage = 0;
+      for (const item of continuationItems) {
+        const t = parseTrackItem(item);
+        if (t) {
+          tracks.push(t);
+          addedThisPage++;
+        }
+      }
+
+      continuationToken = getContinuationToken(continuationItems);
+      if (addedThisPage === 0) break;
+    } catch (pageErr) {
+      console.error(`[Playlist Scraper] Error on page ${page}:`, pageErr.message);
+      break;
     }
   }
 
