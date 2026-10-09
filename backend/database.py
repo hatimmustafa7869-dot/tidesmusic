@@ -118,6 +118,9 @@ def init_db():
         used INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+
+    INSERT OR IGNORE INTO users (id, username, email, password_hash)
+    VALUES ('tides_public', 'Tides Community', 'public@tidesmusic.online', 'system_public_account_tides_music');
     """)
     conn.commit()
     conn.close()
@@ -579,6 +582,118 @@ def remove_track_from_playlist(playlist_id: str, track_id: str, user_id: str) ->
         return True
     finally:
         conn.close()
+
+def get_playlist_by_id(playlist_id: str) -> Optional[Dict[str, Any]]:
+    """Retrieves any user or shared playlist by its ID, with all tracks and creator info."""
+    conn = get_connection()
+    try:
+        cursor = conn.execute(
+            """SELECT p.id, p.title, p.description, p.thumbnail, p.user_id, p.created_at,
+                      COALESCE(u.username, 'Tides Creator') as author
+               FROM playlists p
+               LEFT JOIN users u ON p.user_id = u.id
+               WHERE p.id = ?""",
+            (playlist_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+
+        pl = dict(row)
+        track_cursor = conn.execute(
+            """SELECT track_id as id, title, artist, thumbnail, duration, duration_formatted as durationFormatted
+               FROM playlist_tracks WHERE playlist_id = ? ORDER BY position ASC, added_at ASC""",
+            (playlist_id,)
+        )
+        pl["tracks"] = [dict(tr) for tr in track_cursor.fetchall()]
+        pl["itemCount"] = len(pl["tracks"])
+        if not pl.get("thumbnail") and pl["tracks"]:
+            pl["thumbnail"] = pl["tracks"][0]["thumbnail"]
+        return pl
+    finally:
+        conn.close()
+
+def save_shared_playlist(
+    playlist_id: str,
+    title: str,
+    description: str = "",
+    thumbnail: str = "",
+    tracks: Optional[List[Dict[str, Any]]] = None,
+    user_id: Optional[str] = None,
+    author: Optional[str] = None
+) -> Dict[str, Any]:
+    """Saves or publishes any playlist so it is permanently accessible via a shared link."""
+    conn = get_connection()
+    try:
+        owner_id = user_id if user_id else 'tides_public'
+        user_check = conn.execute("SELECT id FROM users WHERE id = ?", (owner_id,)).fetchone()
+        if not user_check:
+            owner_id = 'tides_public'
+
+        existing = conn.execute("SELECT id, thumbnail FROM playlists WHERE id = ?", (playlist_id,)).fetchone()
+        final_thumb = thumbnail or (existing["thumbnail"] if existing else "")
+
+        if existing:
+            conn.execute(
+                "UPDATE playlists SET title = ?, description = ?, thumbnail = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (title, description, final_thumb, playlist_id)
+            )
+        else:
+            conn.execute(
+                "INSERT INTO playlists (id, user_id, title, description, thumbnail) VALUES (?, ?, ?, ?, ?)",
+                (playlist_id, owner_id, title, description, final_thumb)
+            )
+
+        inserted_tracks = []
+        if tracks:
+            existing_track_ids = set(
+                r[0] for r in conn.execute("SELECT track_id FROM playlist_tracks WHERE playlist_id = ?", (playlist_id,)).fetchall()
+            )
+            pos = conn.execute("SELECT COUNT(*) FROM playlist_tracks WHERE playlist_id = ?", (playlist_id,)).fetchone()[0]
+
+            for idx, tr in enumerate(tracks):
+                tid = tr.get("id")
+                if not tid:
+                    continue
+                tr_thumb = tr.get("thumbnail", "")
+                if not final_thumb and tr_thumb:
+                    final_thumb = tr_thumb
+                    conn.execute("UPDATE playlists SET thumbnail = ? WHERE id = ?", (final_thumb, playlist_id))
+
+                if tid not in existing_track_ids:
+                    track_row_id = str(uuid.uuid4())
+                    conn.execute(
+                        """INSERT INTO playlist_tracks (id, playlist_id, track_id, title, artist, thumbnail, duration, duration_formatted, position)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            track_row_id,
+                            playlist_id,
+                            tid,
+                            tr.get("title", ""),
+                            tr.get("artist", ""),
+                            tr_thumb,
+                            tr.get("duration", 0),
+                            tr.get("durationFormatted", "0:00"),
+                            pos + idx
+                        )
+                    )
+                    existing_track_ids.add(tid)
+                inserted_tracks.append(tr)
+
+        conn.commit()
+        export_disaster_recovery_snapshot()
+        return {
+            "id": playlist_id,
+            "title": title,
+            "description": description,
+            "thumbnail": final_thumb,
+            "tracks": inserted_tracks,
+            "itemCount": len(inserted_tracks),
+            "author": author or "Tides Creator"
+        }
+    finally:
+        conn.close()
+
 
 # --- Favorites Helpers ---
 

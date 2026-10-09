@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AuthModal } from './components/AuthModal';
 import { BottomNav } from './components/BottomNav';
 import { DownloadAppModal } from './components/DownloadAppModal';
@@ -21,11 +21,45 @@ import { PlaylistView } from './pages/PlaylistView';
 import { SearchPage } from './pages/SearchPage';
 import type { Track } from './types';
 
+interface NavState {
+  view: 'home' | 'search' | 'playlist' | 'favorites' | 'history';
+  playlistId?: string;
+  searchQuery?: string;
+}
+
+const getInitialRoute = (): NavState => {
+  try {
+    const searchParams = new URLSearchParams(window.location.search);
+    const queryPl = searchParams.get('playlist') || searchParams.get('pl') || searchParams.get('id');
+    if (queryPl) {
+      return { view: 'playlist', playlistId: queryPl.trim() };
+    }
+    const searchQ = searchParams.get('q') || searchParams.get('search');
+    if (searchQ) {
+      return { view: 'search', searchQuery: searchQ.trim() };
+    }
+
+    const pathname = window.location.pathname;
+    const pathMatch = pathname.match(/^\/playlist\/(.+)/);
+    if (pathMatch && pathMatch[1]) {
+      return { view: 'playlist', playlistId: decodeURIComponent(pathMatch[1]).trim() };
+    }
+
+    const hash = window.location.hash;
+    const hashMatch = hash.match(/^#\/?playlist\/(.+)/);
+    if (hashMatch && hashMatch[1]) {
+      return { view: 'playlist', playlistId: decodeURIComponent(hashMatch[1]).trim() };
+    }
+  } catch {}
+  return { view: 'home' };
+};
+
 export const MainApp: React.FC = () => {
-  const [currentView, setCurrentView] = useState<'home' | 'search' | 'playlist' | 'favorites' | 'history'>('home');
+  const initialRoute = useRef(getInitialRoute()).current;
+  const [currentView, setCurrentView] = useState<'home' | 'search' | 'playlist' | 'favorites' | 'history'>(initialRoute.view);
   const [homeCategory, setHomeCategory] = useState<'all' | 'songs' | 'playlists'>('all');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>(initialRoute.searchQuery || '');
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>(initialRoute.playlistId || '');
 
   // Modals & Panels
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -131,19 +165,51 @@ export const MainApp: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [togglePlay, seek, currentTime, duration, setVolume, volume, toggleMute, nextTrack, prevTrack]);
 
-  interface NavState {
-    view: 'home' | 'search' | 'playlist' | 'favorites' | 'history';
-    playlistId?: string;
-    searchQuery?: string;
-  }
+  const [navHistory, setNavHistory] = useState<NavState[]>([
+    ...(initialRoute.view !== 'home' ? [{ view: 'home' as const }, initialRoute] : [initialRoute])
+  ]);
+  const [navIndex, setNavIndex] = useState(initialRoute.view !== 'home' ? 1 : 0);
 
-  const [navHistory, setNavHistory] = useState<NavState[]>([{ view: 'home' }]);
-  const [navIndex, setNavIndex] = useState(0);
+  const updateUrlForState = (state: NavState, replace: boolean = false) => {
+    try {
+      let targetUrl = '/';
+      if (state.view === 'playlist' && state.playlistId) {
+        targetUrl = `/?playlist=${encodeURIComponent(state.playlistId)}`;
+      } else if (state.view === 'search' && state.searchQuery) {
+        targetUrl = `/?search=${encodeURIComponent(state.searchQuery)}`;
+      } else if (state.view === 'favorites') {
+        targetUrl = `/?view=favorites`;
+      } else if (state.view === 'history') {
+        targetUrl = `/?view=history`;
+      }
 
-  const applyNavState = (state: NavState) => {
+      const currentPathAndSearch = window.location.pathname + window.location.search;
+      if (currentPathAndSearch !== targetUrl && window.location.search !== targetUrl) {
+        if (replace) {
+          window.history.replaceState({ state }, '', targetUrl);
+        } else {
+          window.history.pushState({ state }, '', targetUrl);
+        }
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const route = getInitialRoute();
+      applyNavState(route, false);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const applyNavState = (state: NavState, updateHistory: boolean = true) => {
     setCurrentView(state.view);
     if (state.playlistId) setSelectedPlaylistId(state.playlistId);
     if (state.searchQuery !== undefined) setSearchQuery(state.searchQuery);
+    if (updateHistory) {
+      updateUrlForState(state);
+    }
   };
 
   const handleNavigate = (view: string, data?: any) => {
@@ -162,14 +228,14 @@ export const MainApp: React.FC = () => {
     nextHistory.push(nextState);
     setNavHistory(nextHistory);
     setNavIndex(nextHistory.length - 1);
-    applyNavState(nextState);
+    applyNavState(nextState, true);
   };
 
   const handleGoBack = () => {
     if (navIndex > 0) {
       const targetIdx = navIndex - 1;
       setNavIndex(targetIdx);
-      applyNavState(navHistory[targetIdx]);
+      applyNavState(navHistory[targetIdx], true);
     }
   };
 
@@ -177,7 +243,7 @@ export const MainApp: React.FC = () => {
     if (navIndex < navHistory.length - 1) {
       const targetIdx = navIndex + 1;
       setNavIndex(targetIdx);
-      applyNavState(navHistory[targetIdx]);
+      applyNavState(navHistory[targetIdx], true);
     }
   };
 

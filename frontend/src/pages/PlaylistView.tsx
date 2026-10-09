@@ -86,6 +86,12 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
   const [searchResults, setSearchResults] = useState<Track[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
+  // Share modal state
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [shareLink, setShareLink] = useState('');
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [hasCopied, setHasCopied] = useState(false);
+
   // Toast feedback state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimeoutRef = useRef<any>(null);
@@ -323,17 +329,73 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
   };
 
   // Option 11: Share
-  const handleCopyLink = () => {
-    const url = window.location.href;
-    navigator.clipboard.writeText(url).then(() => {
-      showToast('Link copied to clipboard!');
-      setIsMenuOpen(false);
-      setActiveSubmenu(null);
-    });
+  const prepareShareUrl = async (): Promise<string> => {
+    let targetId = playlistData.id;
+    if (playlistData.isLocal || playlistData.id.startsWith('local-pl-')) {
+      setIsPublishing(true);
+      try {
+        const pubRes = await api.publishPlaylist({
+          id: playlistData.id,
+          title: playlistData.title,
+          description: playlistData.description,
+          thumbnail: playlistData.thumbnail,
+          tracks: playlistData.tracks,
+          author: playlistData.author || user?.username || 'Tides Creator'
+        });
+        if (pubRes?.id) {
+          targetId = pubRes.id;
+          setPlaylistData(prev => prev ? { ...prev, id: targetId, isLocal: false } : prev);
+        }
+      } catch (err) {
+        console.warn('Error publishing playlist:', err);
+      } finally {
+        setIsPublishing(false);
+      }
+    }
+    const fullUrl = `${window.location.origin}/?playlist=${encodeURIComponent(targetId)}`;
+    setShareLink(fullUrl);
+    return fullUrl;
+  };
+
+  const handleOpenShareModal = async () => {
+    setIsMenuOpen(false);
+    setActiveSubmenu(null);
+    setHasCopied(false);
+    setIsShareModalOpen(true);
+    await prepareShareUrl();
+  };
+
+  const handleCopyLink = async () => {
+    const url = await prepareShareUrl();
+    try {
+      await navigator.clipboard.writeText(url);
+      setHasCopied(true);
+      showToast('Playlist link copied to clipboard!');
+      setTimeout(() => setHasCopied(false), 3000);
+    } catch {
+      showToast('Could not copy link automatically');
+    }
+    setIsMenuOpen(false);
+    setActiveSubmenu(null);
+  };
+
+  const handleNativeShare = async () => {
+    const url = await prepareShareUrl();
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: playlistData.title,
+          text: `Listen to "${playlistData.title}" on Tides Music`,
+          url
+        });
+      } catch {}
+    } else {
+      handleCopyLink();
+    }
   };
 
   const handleCopyEmbed = () => {
-    const embedCode = `<iframe src="${window.location.origin}/embed/playlist/${playlistData.id}" width="100%" height="380" frameBorder="0" allowtransparency="true" allow="encrypted-media"></iframe>`;
+    const embedCode = `<iframe src="${window.location.origin}/?playlist=${encodeURIComponent(playlistData.id)}" width="100%" height="380" frameBorder="0" allowtransparency="true" allow="encrypted-media"></iframe>`;
     navigator.clipboard.writeText(embedCode).then(() => {
       showToast('Embed code copied to clipboard!');
       setIsMenuOpen(false);
@@ -494,6 +556,32 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
         >
           <ArrowDownCircle className="w-6 h-6" />
         </button>
+
+        {/* Prominent Share Button */}
+        <button
+          onClick={handleOpenShareModal}
+          className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white font-medium text-xs transition border border-white/15 shadow-sm"
+          title="Share playlist"
+        >
+          <Share2 className="w-3.5 h-3.5 text-[#1ed760]" />
+          <span>Share</span>
+        </button>
+
+        {/* Save / In Library Button */}
+        {!localPlaylist && (
+          <button
+            onClick={handleSaveToLibrary}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full font-medium text-xs transition border shadow-sm ${
+              isSaved
+                ? 'bg-[#1ed760]/20 text-[#1ed760] border-[#1ed760]/30'
+                : 'bg-white/10 hover:bg-white/20 text-white border-white/15'
+            }`}
+            title={isSaved ? 'Saved in Your Library' : 'Save to Your Library'}
+          >
+            {isSaved ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+            <span>{isSaved ? 'In Library' : 'Save to Library'}</span>
+          </button>
+        )}
 
         {/* Invite Collaborators Button */}
         <button
@@ -696,6 +784,13 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
                 {activeSubmenu === 'share' && (
                   <div className="absolute left-full top-0 ml-1 w-52 bg-[#282828] border border-[#3e3e3e] rounded-lg shadow-2xl py-1.5 text-sm z-50">
                     <button
+                      onClick={handleOpenShareModal}
+                      className="w-full px-4 py-2 text-left hover:bg-[#3e3e3e] flex items-center gap-2"
+                    >
+                      <Share2 className="w-3.5 h-3.5 text-[#1ed760]" />
+                      <span>Share options...</span>
+                    </button>
+                    <button
                       onClick={handleCopyLink}
                       className="w-full px-4 py-2 text-left hover:bg-[#3e3e3e] flex items-center gap-2"
                     >
@@ -709,24 +804,6 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
                       <ExternalLink className="w-3.5 h-3.5 text-zinc-400" />
                       <span>Copy embed code</span>
                     </button>
-                    <a
-                      href={`https://wa.me/?text=${encodeURIComponent(`Check out this playlist "${playlistData.title}" on Tides Music: ${window.location.href}`)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full px-4 py-2 text-left hover:bg-[#3e3e3e] block"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      Share to WhatsApp
-                    </a>
-                    <a
-                      href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Listening to "${playlistData.title}" on Tides Music! 🎵`)}&url=${encodeURIComponent(window.location.href)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full px-4 py-2 text-left hover:bg-[#3e3e3e] block"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      Share to X (Twitter)
-                    </a>
                   </div>
                 )}
               </div>
@@ -1093,6 +1170,134 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
                   );
                 })
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modern Glassmorphic Share Playlist Modal */}
+      {isShareModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in select-none">
+          <div className="relative w-full max-w-md bg-[#0f121d]/90 backdrop-blur-2xl border border-white/15 rounded-3xl shadow-[0_24px_64px_rgba(0,0,0,0.8)] p-6 text-white space-y-5 animate-scale-up">
+            {/* Top Specular Line */}
+            <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/25 to-transparent rounded-t-3xl pointer-events-none" />
+
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#1ed760]/15 border border-[#1ed760]/30 flex items-center justify-center text-[#1ed760]">
+                  <Share2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white tracking-tight">Share Playlist</h3>
+                  <p className="text-xs text-zinc-400">Anyone with this link can view & play this playlist</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsShareModalOpen(false)}
+                className="p-1.5 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Playlist Preview Card */}
+            <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-white/[0.04] border border-white/10">
+              <img
+                src={playlistData.thumbnail || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80'}
+                alt=""
+                className="w-14 h-14 rounded-xl object-cover shadow-lg border border-white/10"
+              />
+              <div className="flex-1 min-w-0">
+                <h4 className="text-sm font-bold text-white truncate">{playlistData.title}</h4>
+                <p className="text-xs text-zinc-400 truncate">
+                  {playlistData.author || user?.username || 'Tides Creator'} &bull; {tracks.length} songs
+                </p>
+              </div>
+            </div>
+
+            {/* Generated Share Link Box */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-zinc-300">Public Playlist Link</label>
+                {isPublishing && (
+                  <span className="text-[11px] text-[#1ed760] flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Saving to database...
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 p-1.5 pl-3.5 bg-black/40 border border-white/15 rounded-xl">
+                <input
+                  type="text"
+                  readOnly
+                  value={isPublishing ? 'Preparing link...' : shareLink}
+                  className="flex-1 bg-transparent text-xs text-zinc-200 focus:outline-none select-all font-mono truncate"
+                />
+                <button
+                  onClick={handleCopyLink}
+                  disabled={isPublishing}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg font-bold text-xs transition shrink-0 ${
+                    hasCopied
+                      ? 'bg-[#1ed760] text-black shadow-lg scale-95'
+                      : 'bg-[#1ed760] hover:bg-[#1fdf64] text-black active:scale-95'
+                  }`}
+                >
+                  {hasCopied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Share Buttons */}
+            <div className="space-y-2 pt-1">
+              <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Quick Share</span>
+              <div className="grid grid-cols-3 gap-2.5">
+                {typeof navigator !== 'undefined' && 'share' in navigator && (
+                  <button
+                    onClick={handleNativeShare}
+                    className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl bg-white/[0.05] hover:bg-white/[0.1] transition border border-white/10 text-xs font-semibold text-zinc-200 active:scale-95"
+                  >
+                    <Share2 className="w-5 h-5 text-indigo-400" />
+                    <span>Device</span>
+                  </button>
+                )}
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(`Listen to this playlist "${playlistData.title}" on Tides Music: ${shareLink}`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 transition border border-emerald-500/30 text-xs font-semibold text-emerald-300 active:scale-95"
+                >
+                  <span className="text-base font-bold text-emerald-400 leading-none">WA</span>
+                  <span>WhatsApp</span>
+                </a>
+                <a
+                  href={`https://t.me/share/url?url=${encodeURIComponent(shareLink)}&text=${encodeURIComponent(`Listen to "${playlistData.title}" on Tides Music!`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl bg-sky-500/10 hover:bg-sky-500/20 transition border border-sky-500/30 text-xs font-semibold text-sky-300 active:scale-95"
+                >
+                  <span className="text-base font-bold text-sky-400 leading-none">TG</span>
+                  <span>Telegram</span>
+                </a>
+                <a
+                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Listening to "${playlistData.title}" on Tides Music! 🎵`)}&url=${encodeURIComponent(shareLink)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl bg-blue-500/10 hover:bg-blue-500/20 transition border border-blue-500/30 text-xs font-semibold text-blue-300 active:scale-95"
+                >
+                  <span className="text-base font-bold text-blue-400 leading-none">X</span>
+                  <span>Twitter</span>
+                </a>
+              </div>
             </div>
           </div>
         </div>

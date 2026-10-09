@@ -102,6 +102,30 @@ export const api = {
     return data.playlist;
   },
 
+  async publishPlaylist(playlist: {
+    id?: string;
+    title: string;
+    description?: string;
+    thumbnail?: string;
+    tracks?: Track[];
+    author?: string;
+  }): Promise<{ id: string; shareUrl: string; playlist: Playlist }> {
+    const res = await fetch(`${API_BASE}/playlist/share`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        id: playlist.id,
+        title: playlist.title,
+        description: playlist.description || '',
+        thumbnail: playlist.thumbnail || '',
+        tracks: playlist.tracks || [],
+        author: playlist.author || 'Tides Creator'
+      })
+    });
+    if (!res.ok) throw new Error('Failed to share playlist');
+    return res.json();
+  },
+
   async updateUserPlaylist(playlistId: string, title: string, description?: string, thumbnail?: string): Promise<void> {
     await fetch(`${API_BASE}/user/playlists/${encodeURIComponent(playlistId)}`, {
       method: 'PUT',

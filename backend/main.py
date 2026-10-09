@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr
 import httpx
 
-from backend.auth import create_access_token, get_current_user, get_optional_user, hash_password, verify_password
+from backend.auth import create_access_token, decode_access_token, get_current_user, get_optional_user, hash_password, verify_password
 from backend.config import settings
 from backend.jam import jam_manager
 from backend.database import (
@@ -27,6 +27,7 @@ from backend.database import (
     delete_user_playlist,
     export_disaster_recovery_snapshot,
     export_full_database_json,
+    get_playlist_by_id,
     get_user_by_id,
     get_user_by_username_or_email,
     get_user_favorites,
@@ -35,6 +36,7 @@ from backend.database import (
     import_full_database_json,
     init_db,
     remove_track_from_playlist,
+    save_shared_playlist,
     sync_full_user_library,
     toggle_user_favorite,
     update_user_password,
@@ -100,6 +102,14 @@ class UpdatePlaylistRequest(BaseModel):
 
 class BatchTracksRequest(BaseModel):
     tracks: List[TrackPayload]
+
+class PublishPlaylistRequest(BaseModel):
+    id: Optional[str] = None
+    title: str
+    description: Optional[str] = ""
+    thumbnail: Optional[str] = ""
+    tracks: Optional[List[TrackPayload]] = []
+    author: Optional[str] = "Tides Creator"
 
 class SyncLibraryRequest(BaseModel):
     localPlaylists: Optional[List[Dict[str, Any]]] = []
@@ -264,6 +274,43 @@ async def remove_track_endpoint(
     )
     return {"status": "ok"}
 
+@app.post("/api/playlist/share")
+@app.post("/api/playlist/publish")
+async def share_playlist_endpoint(
+    req: PublishPlaylistRequest,
+    authorization: Optional[str] = Header(None)
+):
+    user_id = None
+    author = req.author or "Tides Creator"
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
+        payload = decode_access_token(token)
+        if payload:
+            user_id = payload.get("sub")
+            if payload.get("username"):
+                author = payload.get("username")
+
+    pid = req.id
+    if not pid or pid.startswith("local-pl-"):
+        pid = f"pl-{uuid.uuid4().hex[:12]}"
+
+    tracks_data = [t.model_dump() for t in req.tracks] if req.tracks else []
+    pl = save_shared_playlist(
+        playlist_id=pid,
+        title=req.title.strip(),
+        description=req.description or "",
+        thumbnail=req.thumbnail or "",
+        tracks=tracks_data,
+        user_id=user_id,
+        author=author
+    )
+    return {
+        "status": "ok",
+        "id": pid,
+        "playlist": pl,
+        "shareUrl": f"/?playlist={pid}"
+    }
+
 # --- Full User Library Sync (Merges Guest Playlists on Sign In) ---
 
 @app.post("/api/user/sync")
@@ -367,9 +414,29 @@ async def get_home():
 async def get_playlist(playlist_id: str):
     try:
         clean_id = playlist_id.strip()
+
+        # 1. Check if it's an app user or shared playlist in our SQLite database
+        local_pl = get_playlist_by_id(clean_id)
+        if local_pl:
+            return {
+                "info": {
+                    "id": local_pl["id"],
+                    "title": local_pl["title"],
+                    "description": local_pl.get("description", ""),
+                    "thumbnail": local_pl.get("thumbnail", ""),
+                    "author": local_pl.get("author") or "Tides Creator",
+                    "itemCount": local_pl.get("itemCount", len(local_pl.get("tracks", []))),
+                    "isAppPlaylist": True
+                },
+                "tracks": local_pl.get("tracks", [])
+            }
+
+        # 2. Check Spotify playlist
         if clean_id.startswith("spotify:") or clean_id.startswith("spotify_") or "open.spotify.com" in clean_id or (len(clean_id) == 22 and not "_" in clean_id and not "-" in clean_id):
             data = await youtube_service.get_spotify_playlist(clean_id)
             return data
+
+        # 3. Fallback to YouTube Music playlist
         data = await youtube_service.get_playlist(clean_id)
         return data
     except Exception as e:
@@ -604,6 +671,15 @@ async def download_pc():
 
 # Mount frontend/dist if available so the whole app runs from a single unified server
 dist_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
+
+@app.get("/playlist/{playlist_id}")
+async def serve_playlist_spa(playlist_id: str):
+    index_file = os.path.join(dist_path, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    from starlette.responses import RedirectResponse
+    return RedirectResponse(f"/?playlist={playlist_id}")
+
 if os.path.exists(dist_path):
     app.mount("/", StaticFiles(directory=dist_path, html=True), name="static")
 
