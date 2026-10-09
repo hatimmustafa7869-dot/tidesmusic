@@ -8,6 +8,7 @@ const cors = require('cors');
 const { WebSocketServer, WebSocket } = require('ws');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 const app = express();
@@ -196,6 +197,158 @@ app.get('/api/auth/me', authenticateToken, (req, res) => {
     return res.status(404).json({ detail: 'User not found' });
   }
   res.json({ user: { id: user.id, username: user.username, email: user.email, created_at: user.createdAt } });
+});
+
+// Hostinger SMTP & Password Reset
+const resetTokens = new Map(); // email.toLowerCase() -> { code: '123456', expiresAt: timestamp, attempts: 0 }
+
+const SMTP_HOST = process.env.SMTP_HOST || 'smtp.hostinger.com';
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '465', 10);
+const SMTP_SECURE = process.env.SMTP_SECURE !== undefined ? (process.env.SMTP_SECURE === 'true') : (SMTP_PORT === 465);
+const SMTP_USER = process.env.SMTP_USER || '';
+const SMTP_PASS = process.env.SMTP_PASS || '';
+const SMTP_FROM = process.env.SMTP_FROM || (SMTP_USER ? `Tides Music <${SMTP_USER}>` : 'Tides Music <support@tidesmusic.com>');
+
+async function sendPasswordResetEmail(recipientEmail, resetCode) {
+  if (!SMTP_USER || !SMTP_PASS) {
+    console.log(`\n==================================================`);
+    console.log(`[Hostinger SMTP Notice] SMTP_USER or SMTP_PASS not set in environment.`);
+    console.log(`[Hostinger SMTP Code] Verification Code for ${recipientEmail}: ${resetCode}`);
+    console.log(`==================================================\n`);
+    return { sent: false, devCode: resetCode };
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
+    auth: {
+      user: SMTP_USER,
+      pass: SMTP_PASS
+    },
+    tls: {
+      rejectUnauthorized: false
+    }
+  });
+
+  const htmlContent = `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      body { margin: 0; padding: 0; background-color: #070709; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #ffffff; }
+      .container { max-width: 540px; margin: 40px auto; padding: 36px; background: rgba(18, 18, 24, 0.95); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 28px; box-shadow: 0 20px 50px rgba(0,0,0,0.6); }
+      .brand-title { font-size: 26px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; margin: 0 0 16px 0; }
+      .brand-title span { color: #1ed760; }
+      .text { font-size: 15px; line-height: 1.6; color: #a1a1aa; margin: 0 0 24px 0; }
+      .code-box { background: linear-gradient(135deg, rgba(30,215,96,0.12), rgba(14,165,233,0.12)); border: 1px solid rgba(30,215,96,0.35); border-radius: 20px; padding: 24px; text-align: center; margin: 28px 0; }
+      .code { font-size: 40px; font-weight: 800; letter-spacing: 10px; color: #1ed760; font-family: 'Courier New', monospace; }
+      .expiry { font-size: 13px; color: #71717a; margin-top: 10px; font-weight: 500; }
+      .footer { font-size: 12px; color: #52525b; text-align: center; margin-top: 36px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 20px; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="brand-title">🌊 Tides <span>Music</span></div>
+      <p class="text">We received a request to reset the password for your account associated with <strong>${recipientEmail}</strong>.</p>
+      <div class="code-box">
+        <div class="code">${resetCode}</div>
+        <div class="expiry">This verification code expires in 15 minutes.</div>
+      </div>
+      <p class="text" style="font-size: 13px;">If you didn't request a password reset, you can safely ignore this email. Your account remains completely secure.</p>
+      <div class="footer">
+        &copy; ${new Date().getFullYear()} Tides Music. High-Fidelity Music Streaming.
+      </div>
+    </div>
+  </body>
+  </html>
+  `;
+
+  await transporter.sendMail({
+    from: SMTP_FROM,
+    to: recipientEmail,
+    subject: `Your Tides Music Reset Code: ${resetCode}`,
+    text: `Your Tides Music password reset code is: ${resetCode}. This code expires in 15 minutes.`,
+    html: htmlContent
+  });
+
+  return { sent: true };
+}
+
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const { email } = req.body || {};
+  if (!email || !email.includes('@')) {
+    return res.status(400).json({ detail: 'Please enter a valid email address' });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const user = db.users.find(u => u.email && u.email.toLowerCase() === cleanEmail);
+  if (!user) {
+    return res.status(404).json({ detail: 'No account found with this email address' });
+  }
+
+  // Generate 6-digit numeric OTP
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = Date.now() + 15 * 60 * 1000; // 15 mins
+  resetTokens.set(cleanEmail, { code, expiresAt, attempts: 0 });
+
+  try {
+    const result = await sendPasswordResetEmail(cleanEmail, code);
+    res.json({
+      success: true,
+      message: result.sent ? 'Verification code sent to your email.' : 'Reset code generated (check server console or configure Hostinger SMTP).',
+      devCode: (!SMTP_USER || !SMTP_PASS) ? code : undefined
+    });
+  } catch (err) {
+    console.error('Hostinger SMTP delivery error:', err);
+    res.status(500).json({ detail: `Failed to deliver email: ${err.message}` });
+  }
+});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  const { email, code, newPassword } = req.body || {};
+  if (!email || !code || !newPassword) {
+    return res.status(400).json({ detail: 'Email, verification code, and new password are required' });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ detail: 'New password must be at least 6 characters' });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const tokenData = resetTokens.get(cleanEmail);
+
+  if (!tokenData) {
+    return res.status(400).json({ detail: 'No active reset request found for this email. Please request a new code.' });
+  }
+
+  if (Date.now() > tokenData.expiresAt) {
+    resetTokens.delete(cleanEmail);
+    return res.status(400).json({ detail: 'Verification code has expired. Please request a new code.' });
+  }
+
+  if (tokenData.code !== code.trim()) {
+    tokenData.attempts = (tokenData.attempts || 0) + 1;
+    if (tokenData.attempts >= 5) {
+      resetTokens.delete(cleanEmail);
+      return res.status(400).json({ detail: 'Too many incorrect attempts. Please request a new code.' });
+    }
+    return res.status(400).json({ detail: 'Invalid verification code' });
+  }
+
+  const user = db.users.find(u => u.email && u.email.toLowerCase() === cleanEmail);
+  if (!user) {
+    return res.status(404).json({ detail: 'User not found' });
+  }
+
+  const newHash = await bcrypt.hash(newPassword, 10);
+  user.passwordHash = newHash;
+  saveDb();
+  resetTokens.delete(cleanEmail);
+
+  res.json({ success: true, message: 'Password reset successful! You can now log in with your new password.' });
 });
 
 // ==========================================

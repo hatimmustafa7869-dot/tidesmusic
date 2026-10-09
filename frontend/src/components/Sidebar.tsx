@@ -87,7 +87,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const showPlaylists = activeFilter === 'all' || activeFilter === 'playlists';
 
   const sidebarContent = (
-    <div className="flex flex-col h-full bg-[#0c0c0e]/60 backdrop-blur-2xl rounded-2xl select-none text-zinc-400 p-3 overflow-hidden border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+    <div className="flex flex-col h-full bg-[#0b0e17]/65 backdrop-blur-3xl rounded-3xl select-none text-zinc-400 p-3.5 overflow-hidden border border-white/[0.12] shadow-[0_16px_48px_rgba(0,0,0,0.6)] relative">
+      <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
       {/* Mobile Top Navigation Links */}
       <div className="md:hidden flex flex-col gap-1 pb-3 mb-2 border-b border-white/[0.08]">
         <button
@@ -420,13 +421,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Bottom Download App CTA */}
-      <div className="pt-2 px-1 border-t border-white/5 shrink-0 mt-auto">
+      <div className="pt-2 px-1 border-t border-white/[0.08] shrink-0 mt-auto">
         <button
           onClick={onOpenDownloadApp}
-          className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-gradient-to-r from-[#181818] to-[#1f1f1f] hover:from-[#202020] hover:to-[#282828] border border-white/5 text-white transition group shadow-sm hover:scale-[1.02] active:scale-[0.98]"
+          className="w-full flex items-center justify-between px-3 py-2.5 rounded-2xl bg-gradient-to-r from-white/[0.08] to-white/[0.03] hover:from-white/[0.14] hover:to-white/[0.06] border border-white/[0.1] text-white transition group shadow-md hover:scale-[1.02] active:scale-[0.98] backdrop-blur-xl"
         >
           <div className="flex items-center gap-2.5 min-w-0">
-            <img src="/logo.png" alt="Tides" className="w-6 h-6 rounded-md object-cover shadow" />
+            <img src="/logo.png" alt="Tides" className="w-6 h-6 rounded-lg object-cover shadow" />
             <div className="text-left min-w-0">
               <p className="text-xs font-bold text-white group-hover:text-[#1ed760] transition truncate">Get Tides App</p>
               <p className="text-[10px] text-zinc-400 truncate">For Phone (APK) & PC</p>

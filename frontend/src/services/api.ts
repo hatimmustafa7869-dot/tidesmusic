@@ -49,6 +49,32 @@ export const api = {
     return res.json();
   },
 
+  async forgotPassword(email: string): Promise<{ success: boolean; message: string; devCode?: string }> {
+    const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json().catch(() => ({ detail: 'Failed to send reset code' }));
+    if (!res.ok) {
+      throw new Error(data.detail || 'Failed to send reset code');
+    }
+    return data;
+  },
+
+  async resetPassword(email: string, code: string, newPassword: string): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${API_BASE}/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code, newPassword })
+    });
+    const data = await res.json().catch(() => ({ detail: 'Failed to reset password' }));
+    if (!res.ok) {
+      throw new Error(data.detail || 'Failed to reset password');
+    }
+    return data;
+  },
+
   // User Cloud Playlists API
   async getUserPlaylists(): Promise<Playlist[]> {
     const res = await fetch(`${API_BASE}/user/playlists`, {

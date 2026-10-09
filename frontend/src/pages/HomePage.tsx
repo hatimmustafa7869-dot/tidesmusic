@@ -140,33 +140,33 @@ export const HomePage: React.FC<HomePageProps> = ({
   return (
     <div className="space-y-7 pb-24 animate-fade-in select-none">
       {/* Category Pills Bar: All, Songs, Playlists */}
-      <div className="flex items-center gap-2 pt-1 pb-2 border-b border-white/[0.06]">
+      <div className="flex items-center gap-2 pt-1 pb-3 border-b border-white/[0.08]">
         <button
           onClick={() => setActiveTab('all')}
-          className={`px-4 py-1.5 rounded-full text-xs font-bold transition duration-200 ${
+          className={`px-5 py-2 rounded-full text-xs font-bold transition duration-200 ${
             activeTab === 'all'
-              ? 'bg-white text-black shadow-md font-extrabold scale-105'
-              : 'bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/[0.06] backdrop-blur-md'
+              ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.3)] font-extrabold scale-105'
+              : 'bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white border border-white/10 backdrop-blur-xl'
           }`}
         >
           All
         </button>
         <button
           onClick={() => setActiveTab('songs')}
-          className={`px-4 py-1.5 rounded-full text-xs font-bold transition duration-200 ${
+          className={`px-5 py-2 rounded-full text-xs font-bold transition duration-200 ${
             activeTab === 'songs'
-              ? 'bg-white text-black shadow-md font-extrabold scale-105'
-              : 'bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/[0.06] backdrop-blur-md'
+              ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.3)] font-extrabold scale-105'
+              : 'bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white border border-white/10 backdrop-blur-xl'
           }`}
         >
           Songs
         </button>
         <button
           onClick={() => setActiveTab('playlists')}
-          className={`px-4 py-1.5 rounded-full text-xs font-bold transition duration-200 ${
+          className={`px-5 py-2 rounded-full text-xs font-bold transition duration-200 ${
             activeTab === 'playlists'
-              ? 'bg-white text-black shadow-md font-extrabold scale-105'
-              : 'bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/[0.06] backdrop-blur-md'
+              ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.3)] font-extrabold scale-105'
+              : 'bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white border border-white/10 backdrop-blur-xl'
           }`}
         >
           Playlists
@@ -175,40 +175,46 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* Quick Access 6-Grid (Always visible in All or Songs) */}
       {(activeTab === 'all' || activeTab === 'songs') && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
           {quickCards.map(item => {
             const isItemPlaying = currentTrack?.id === item.id && isPlaying;
             return (
               <div
                 key={item.id}
                 onClick={item.onClick}
-                className="group flex items-center bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] hover:border-white/[0.14] rounded-xl overflow-hidden cursor-pointer transition-all duration-300 select-none pr-3 shadow-sm hover:shadow-lg backdrop-blur-md hover:-translate-y-0.5"
+                className="group relative flex items-center bg-gradient-to-r from-white/[0.08] via-white/[0.04] to-white/[0.02] hover:from-white/[0.14] hover:via-white/[0.08] hover:to-white/[0.04] border border-white/[0.1] hover:border-white/[0.25] rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 select-none pr-3.5 shadow-[0_8px_20px_rgba(0,0,0,0.3)] hover:shadow-[0_16px_36px_rgba(0,0,0,0.5)] backdrop-blur-2xl hover:-translate-y-1"
               >
+                {/* Top specular hairline */}
+                <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
+
                 {item.isLiked ? (
-                  <div className="w-14 h-14 bg-gradient-to-br from-[#450af5] via-[#8e2de2] to-[#ff416c] flex items-center justify-center shrink-0 shadow">
-                    <Heart className="w-6 h-6 text-white fill-current drop-shadow-sm" />
+                  <div className="w-16 h-16 bg-gradient-to-br from-[#450af5] via-[#8e2de2] to-[#ff416c] flex items-center justify-center shrink-0 shadow-lg">
+                    <Heart className="w-7 h-7 text-white fill-current drop-shadow-md" />
                   </div>
                 ) : item.thumbnail ? (
                   <img
                     src={item.thumbnail}
                     alt={item.title}
-                    className="w-14 h-14 object-cover shrink-0 shadow"
+                    className="w-16 h-16 object-cover shrink-0 shadow-lg"
                   />
                 ) : (
-                  <div className="w-14 h-14 bg-gradient-to-tr from-emerald-600 to-teal-800 flex items-center justify-center shrink-0 shadow">
-                    <ListMusic className="w-6 h-6 text-white/90" />
+                  <div className="w-16 h-16 bg-gradient-to-tr from-emerald-600 to-teal-800 flex items-center justify-center shrink-0 shadow-lg">
+                    <ListMusic className="w-7 h-7 text-white/90" />
                   </div>
                 )}
 
-                <div className="flex-1 px-3.5 min-w-0">
-                  <span className="text-sm font-bold text-white truncate block">
+                <div className="flex-1 px-4 min-w-0">
+                  <span className="text-sm font-extrabold text-white truncate block tracking-tight">
                     {item.title}
+                  </span>
+                  <span className="text-xs text-zinc-400 font-medium block mt-0.5">
+                    {item.count} {item.count === 1 ? 'track' : 'tracks'}
                   </span>
                 </div>
 
                 {/* Floating Spotify Green Play Button */}
                 <div
-                  className={`w-10 h-10 rounded-full bg-[#1ed760] text-black flex items-center justify-center shadow-xl transition-all duration-200 transform group-hover:scale-105 shrink-0 ${
+                  className={`w-11 h-11 rounded-full bg-[#1ed760] text-black flex items-center justify-center shadow-[0_4px_16px_rgba(30,215,96,0.4)] transition-all duration-200 transform group-hover:scale-105 shrink-0 ${
                     isItemPlaying ? 'opacity-100 scale-100' : 'opacity-0 group-hover:opacity-100'
                   }`}
                 >
@@ -222,23 +228,25 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* Section 1: Today's Biggest Hits (Prominently at the Top) */}
       {(activeTab === 'all' || activeTab === 'songs') && trending.length > 0 && (
-        <section className="space-y-3 pt-2">
+        <section className="space-y-3.5 pt-2">
           <div className="flex items-center justify-between">
-            <div>
+            <div className="flex items-center gap-3">
               <h2 className="text-xl md:text-2xl font-black text-white hover:underline cursor-pointer tracking-tight">
                 Today's Biggest Hits
               </h2>
-              <p className="text-xs text-zinc-400 mt-0.5">Top trending songs on charts worldwide</p>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-[#1ed760]/15 text-[#1ed760] border border-[#1ed760]/30 shadow-[0_0_12px_rgba(30,215,96,0.25)]">
+                Trending
+              </span>
             </div>
             <button
               onClick={() => playPlaylist(trending, 0)}
-              className="text-xs font-bold text-zinc-400 hover:text-white hover:underline px-3 py-1 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition"
+              className="text-xs font-bold text-zinc-300 hover:text-white px-4 py-1.5 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 backdrop-blur-xl shadow-sm transition"
             >
               Play all
             </button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-4">
             {trending.slice(0, 6).map(track => (
               <TrackCard key={track.id} item={track} />
             ))}
@@ -248,12 +256,14 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* Section 2: Popular Tracks (Table View with rankings) */}
       {(activeTab === 'all' || activeTab === 'songs') && trending.length > 0 && (
-        <section className="space-y-3 pt-3">
+        <section className="space-y-3.5 pt-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-black text-white tracking-tight">Popular Tracks</h2>
-            <span className="text-xs text-zinc-500 font-semibold">Ranked by plays</span>
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-black text-white tracking-tight">Popular Tracks</h2>
+              <span className="text-xs text-zinc-400 font-semibold">Ranked by plays</span>
+            </div>
           </div>
-          <div className="bg-white/[0.02] backdrop-blur-md rounded-2xl p-2 sm:p-2.5 border border-white/[0.06] shadow-sm">
+          <div className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl p-2.5 sm:p-3.5 border border-white/[0.1] shadow-[0_12px_32px_rgba(0,0,0,0.4)]">
             {trending.slice(0, 8).map((track, idx) => (
               <TrackRow
                 key={track.id}

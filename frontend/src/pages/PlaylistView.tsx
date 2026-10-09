@@ -382,8 +382,8 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
       )}
 
       {/* Spotify Giant Playlist Banner */}
-      <div className="relative -mx-4 md:-mx-8 -mt-6 p-6 md:p-8 pt-10 bg-gradient-to-b from-[#8a1474] via-[#381030]/90 to-[#121212] flex flex-col sm:flex-row items-center sm:items-end gap-6 select-none transition duration-300">
-        <div className="relative group w-48 h-48 sm:w-56 sm:h-56 rounded shadow-2xl overflow-hidden shrink-0 bg-[#282828]">
+      <div className="relative -mx-4 md:-mx-8 -mt-6 p-6 md:p-8 pt-10 bg-gradient-to-b from-cyan-600/25 via-indigo-950/40 to-transparent backdrop-blur-2xl border-b border-white/[0.08] flex flex-col sm:flex-row items-center sm:items-end gap-6 select-none transition duration-300">
+        <div className="relative group w-48 h-48 sm:w-56 sm:h-56 rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.6)] overflow-hidden shrink-0 bg-white/[0.05] border border-white/[0.15]">
           <img
             src={playlistData.thumbnail || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80'}
             alt={playlistData.title}

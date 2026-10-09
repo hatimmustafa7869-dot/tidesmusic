@@ -86,7 +86,7 @@ export const Player: React.FC<PlayerProps> = ({
   const volumePercent = isMuted ? 0 : volume * 100;
 
   return (
-    <div className="relative z-40 bg-[#070709]/85 backdrop-blur-2xl border-t border-white/[0.08] select-none text-white shrink-0 shadow-[0_-8px_32px_rgba(0,0,0,0.6)]">
+    <div className="relative z-40 bg-[#090d16]/85 backdrop-blur-3xl border-t border-white/[0.12] select-none text-white shrink-0 shadow-[0_-12px_40px_rgba(0,0,0,0.7)]">
       {/* Top Edge Progress Bar for Mobile */}
       <div
         className="md:hidden absolute top-0 left-0 right-0 h-[2.5px] bg-white/[0.08] cursor-pointer"

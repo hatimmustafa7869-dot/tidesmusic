@@ -67,7 +67,8 @@ export const NowPlayingSidebar: React.FC<NowPlayingSidebarProps> = ({
   const nextTrack = queue[queueIndex + 1];
 
   return (
-    <aside className="hidden lg:flex flex-col w-72 xl:w-80 h-full bg-[#0c0c0e]/60 backdrop-blur-2xl rounded-2xl select-none shrink-0 overflow-hidden border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.4)] animate-fade-in">
+    <aside className="hidden lg:flex flex-col w-72 xl:w-80 h-full bg-[#0b0e17]/65 backdrop-blur-3xl rounded-3xl select-none shrink-0 overflow-hidden border border-white/[0.12] shadow-[0_16px_48px_rgba(0,0,0,0.6)] animate-fade-in relative">
+      <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
       {/* Top Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08]">
         <span className="text-sm font-bold text-white truncate max-w-[190px]">

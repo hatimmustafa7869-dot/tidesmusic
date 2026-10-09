@@ -64,7 +64,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const initialLetter = user?.username ? user.username.charAt(0).toUpperCase() : 'T';
 
   return (
-    <header className="h-14 px-2 sm:px-4 flex items-center justify-between gap-2 sm:gap-4 select-none shrink-0 bg-[#09090b]/75 backdrop-blur-2xl border-b border-white/[0.08] text-white z-30 shadow-sm">
+    <header className="h-14 px-2 sm:px-4 flex items-center justify-between gap-2 sm:gap-4 select-none shrink-0 bg-[#090d16]/80 backdrop-blur-3xl border-b border-white/[0.12] text-white z-30 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
       {/* Left: Mobile Library Menu & Brand Logo & Navigation History Arrows */}
       <div className="flex items-center gap-1 sm:gap-2.5 shrink-0">
         {/* Mobile Library Menu Toggle */}
@@ -73,7 +73,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           className="md:hidden p-1.5 text-zinc-300 hover:text-white rounded-xl hover:bg-white/[0.08] active:scale-95 transition"
           title="Open Library Menu"
         >
-          <img src="/logo.png" alt="Tides" className="w-7 h-7 rounded-lg object-cover shadow" />
+          <img src="/logo.png" alt="Tides" className="w-7 h-7 rounded-lg object-cover shadow-[0_0_12px_rgba(0,210,255,0.3)] border border-white/20" />
         </button>
 
         {/* Desktop Brand Logo */}
@@ -85,10 +85,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           <img
             src="/logo.png"
             alt="Tides Music"
-            className="w-8 h-8 rounded-xl object-cover shadow-lg group-hover:scale-105 transition duration-200 border border-white/10"
+            className="w-8 h-8 rounded-xl object-cover shadow-[0_0_16px_rgba(0,210,255,0.35)] group-hover:scale-105 transition duration-200 border border-white/20"
           />
           <span className="hidden xl:inline text-base font-black tracking-tight text-white group-hover:text-[#1ed760] transition">
-            TIDES
+            TIDES <span className="text-[#1ed760] font-bold text-xs tracking-widest uppercase ml-0.5">Music</span>
           </span>
         </div>
 
@@ -97,9 +97,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={onGoBack}
             disabled={!canGoBack}
-            className={`w-8 h-8 rounded-full bg-white/[0.04] border border-white/[0.06] backdrop-blur-md flex items-center justify-center transition ${
+            className={`w-8 h-8 rounded-full bg-white/[0.05] border border-white/[0.1] backdrop-blur-xl flex items-center justify-center transition ${
               canGoBack
-                ? 'text-zinc-200 hover:text-white hover:bg-white/[0.09] hover:border-white/[0.14] cursor-pointer'
+                ? 'text-zinc-200 hover:text-white hover:bg-white/[0.12] hover:border-white/[0.22] cursor-pointer'
                 : 'text-zinc-600 opacity-40 cursor-not-allowed'
             }`}
             title="Go back"
@@ -109,9 +109,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={onGoForward}
             disabled={!canGoForward}
-            className={`w-8 h-8 rounded-full bg-white/[0.04] border border-white/[0.06] backdrop-blur-md flex items-center justify-center transition ${
+            className={`w-8 h-8 rounded-full bg-white/[0.05] border border-white/[0.1] backdrop-blur-xl flex items-center justify-center transition ${
               canGoForward
-                ? 'text-zinc-200 hover:text-white hover:bg-white/[0.09] hover:border-white/[0.14] cursor-pointer'
+                ? 'text-zinc-200 hover:text-white hover:bg-white/[0.12] hover:border-white/[0.22] cursor-pointer'
                 : 'text-zinc-600 opacity-40 cursor-not-allowed'
             }`}
             title="Go forward"
@@ -126,7 +126,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Desktop Round Home Button (Hidden on mobile to provide maximum space for search) */}
         <button
           onClick={onNavigateHome}
-          className="hidden md:flex w-10 h-10 rounded-full bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] hover:border-white/[0.16] backdrop-blur-md hover:scale-105 active:scale-95 text-white items-center justify-center transition shadow-sm shrink-0"
+          className="hidden md:flex w-10 h-10 rounded-full bg-white/[0.06] hover:bg-white/[0.14] border border-white/[0.12] hover:border-white/[0.25] backdrop-blur-xl hover:scale-105 active:scale-95 text-white items-center justify-center transition shadow-sm shrink-0"
           title="Home"
         >
           <Home className="w-4 h-4 fill-current" />
@@ -135,7 +135,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Spacious Responsive Search Bar */}
         <form
           onSubmit={handleSubmit}
-          className="relative flex-1 min-w-0 flex items-center bg-white/[0.05] hover:bg-white/[0.08] focus-within:bg-white/[0.1] border border-white/[0.08] focus-within:border-white/[0.22] backdrop-blur-xl rounded-full px-3 sm:px-3.5 py-1.5 sm:py-2 transition duration-200 shadow-inner"
+          className="relative flex-1 min-w-0 flex items-center bg-white/[0.07] hover:bg-white/[0.1] focus-within:bg-white/[0.12] border border-white/[0.14] focus-within:border-[#1ed760]/60 focus-within:ring-2 focus-within:ring-[#1ed760]/20 backdrop-blur-2xl rounded-full px-3 sm:px-3.5 py-1.5 sm:py-2 transition duration-200 shadow-inner"
         >
           <Search className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-zinc-400 shrink-0 mr-2" />
           <input
