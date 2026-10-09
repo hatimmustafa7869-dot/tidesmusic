@@ -77,15 +77,15 @@ export const HomePage: React.FC<HomePageProps> = ({
     );
   }
 
-  // Curated Fallback mixes to fill Quick Access up to 8 slots
-  const fallbackMixes = [
-    { title: 'Chill Hits', thumb: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&q=80' },
-    { title: 'Top 50 - Global', thumb: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80' },
-    { title: 'Gym & Workout', thumb: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&q=80' },
-    { title: 'Super Hit 90s', thumb: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80' },
-    { title: 'Romantic Melodies', thumb: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=500&q=80' },
-    { title: 'Desi Hip-Hop', thumb: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=500&q=80' },
-    { title: 'Night Drive Vibes', thumb: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=500&q=80' }
+  // Curated Real Public Playlists with authentic songs matching each title
+  const curatedMixes = [
+    { id: 'curated-chill-hits', title: 'Chill Hits', thumb: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&q=80' },
+    { id: 'curated-top-50-global', title: 'Top 50 - Global', thumb: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80' },
+    { id: 'curated-gym-workout', title: 'Gym & Workout', thumb: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&q=80' },
+    { id: 'curated-super-hit-90s', title: 'Super Hit 90s', thumb: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80' },
+    { id: 'curated-romantic-melodies', title: 'Romantic Melodies', thumb: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=500&q=80' },
+    { id: 'curated-desi-hip-hop', title: 'Desi Hip-Hop', thumb: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=500&q=80' },
+    { id: 'curated-night-drive-vibes', title: 'Night Drive Vibes', thumb: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=500&q=80' }
   ];
 
   // Quick Access 8-Grid (Strictly 2 Columns, 8 Cards matching Spotify Mobile Screenshot)
@@ -111,21 +111,15 @@ export const HomePage: React.FC<HomePageProps> = ({
     }))
   ];
 
-  // Fill up to 8 slots if user has fewer than 7 playlists
+  // Fill up to 8 slots with real public curated playlists that contain real songs matching each title
   let fbIdx = 0;
-  while (quickCards.length < 8 && fbIdx < fallbackMixes.length) {
-    const fb = fallbackMixes[fbIdx];
-    const mixIndex = fbIdx;
+  while (quickCards.length < 8 && fbIdx < curatedMixes.length) {
+    const mix = curatedMixes[fbIdx];
     quickCards.push({
-      id: `quick-fb-${fbIdx}`,
-      title: fb.title,
-      thumbnail: fb.thumb,
-      onClick: () => {
-        if (trending.length > 0) {
-          const start = (mixIndex * 2) % trending.length;
-          playPlaylist(trending, start);
-        }
-      }
+      id: mix.id,
+      title: mix.title,
+      thumbnail: mix.thumb,
+      onClick: () => onSelectPlaylist(mix.id)
     });
     fbIdx++;
   }

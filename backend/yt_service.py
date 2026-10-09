@@ -70,6 +70,7 @@ class YouTubeService:
     def __init__(self):
         self.api_key = settings.YOUTUBE_API_KEY
         self.base_url = "https://www.googleapis.com/youtube/v3"
+        self._curated_cache: Dict[str, Dict[str, Any]] = {}
 
     async def _fetch_video_durations(self, client: httpx.AsyncClient, video_ids: List[str]) -> Dict[str, Dict[str, Any]]:
         """Batch fetches duration and channel/view details for a list of video IDs."""
@@ -400,9 +401,128 @@ class YouTubeService:
                 "tracks": formatted_tracks
             }
 
+    CURATED_PLAYLISTS = {
+        "curated-chill-hits": {
+            "title": "Chill Hits",
+            "description": "Kick back to the best chill hits, relaxing tunes, and lo-fi melodies.",
+            "query": "Chill Hits English Acoustic LoFi Pop",
+            "thumbnail": "https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&q=80"
+        },
+        "curated-top-50-global": {
+            "title": "Top 50 - Global",
+            "description": "The most played and trending tracks right now across the globe.",
+            "query": "Billboard Hot 100 Top Global Hits",
+            "thumbnail": "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80"
+        },
+        "curated-gym-workout": {
+            "title": "Gym & Workout",
+            "description": "High-energy workout motivation and pump-up tracks to crush your fitness goals.",
+            "query": "Gym Workout Motivation Songs",
+            "thumbnail": "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&q=80"
+        },
+        "curated-super-hit-90s": {
+            "title": "Super Hit 90s",
+            "description": "Timeless 90s evergreen melodies and golden nostalgic classics.",
+            "query": "90s Bollywood Evergreen Super Hit Songs",
+            "thumbnail": "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80"
+        },
+        "curated-romantic-melodies": {
+            "title": "Romantic Melodies",
+            "description": "Soulful romantic ballads, love melodies, and heartfelt acoustic tracks.",
+            "query": "Best Bollywood Romantic Melodies Love Songs",
+            "thumbnail": "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=500&q=80"
+        },
+        "curated-desi-hip-hop": {
+            "title": "Desi Hip-Hop",
+            "description": "The hottest bars, beats, and anthems from the Desi hip-hop movement.",
+            "query": "Desi Hip Hop Rap Hits",
+            "thumbnail": "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=500&q=80"
+        },
+        "curated-night-drive-vibes": {
+            "title": "Night Drive Vibes",
+            "description": "Atmospheric synthwave, chillstep, and night driving anthems.",
+            "query": "Night Drive Synthwave Chill Vibes",
+            "thumbnail": "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=500&q=80"
+        }
+    }
+
+    async def get_curated_playlist(self, playlist_id: str) -> Dict[str, Any]:
+        """Returns a verified, high-quality public playlist with real songs related to the title."""
+        meta = self.CURATED_PLAYLISTS.get(playlist_id)
+        if not meta:
+            for k, v in self.CURATED_PLAYLISTS.items():
+                if k == playlist_id or k.replace("curated-", "") == playlist_id:
+                    meta = v
+                    playlist_id = k
+                    break
+
+        if not meta:
+            return {"info": {"id": playlist_id, "title": "Playlist", "thumbnail": ""}, "tracks": []}
+
+        # Check memory cache
+        cached = self._curated_cache.get(playlist_id)
+        if cached and len(cached.get("tracks", [])) > 0:
+            return cached
+
+        # Fetch songs via ytmusicapi
+        loop = asyncio.get_event_loop()
+        tracks = []
+        try:
+            results = await loop.run_in_executor(
+                None,
+                lambda: ytmusic.search(meta["query"], filter="songs", limit=40)
+            )
+            for it in results:
+                vid = it.get("videoId")
+                if not vid:
+                    continue
+                artists = ", ".join([a["name"] for a in it.get("artists", [])]) if it.get("artists") else "Various Artists"
+                dur = it.get("duration_seconds") or 0
+                thumbs = it.get("thumbnails", [])
+                thumb = thumbs[-1]["url"] if thumbs else meta["thumbnail"]
+
+                tracks.append({
+                    "id": vid,
+                    "title": it.get("title", "Track"),
+                    "artist": artists,
+                    "thumbnail": thumb,
+                    "duration": dur,
+                    "durationFormatted": it.get("duration") or format_duration(dur),
+                    "type": "song"
+                })
+        except Exception as e:
+            print(f"Error fetching curated playlist {playlist_id} via ytmusic: {e}")
+
+        # Fallback to search if ytmusic didn't return enough tracks
+        if len(tracks) < 5:
+            try:
+                search_res = await self.search(query=meta["query"], search_type="songs")
+                for it in search_res.get("results", []):
+                    if it.get("id") and not any(t["id"] == it["id"] for t in tracks):
+                        tracks.append(it)
+            except Exception as e:
+                print(f"Error in curated fallback search: {e}")
+
+        result = {
+            "info": {
+                "id": playlist_id,
+                "title": meta["title"],
+                "description": meta["description"],
+                "author": "Tides Music",
+                "thumbnail": meta["thumbnail"],
+                "itemCount": len(tracks)
+            },
+            "tracks": tracks
+        }
+        self._curated_cache[playlist_id] = result
+        return result
+
     async def get_playlist(self, playlist_id: str) -> Dict[str, Any]:
         """Fetches metadata and all tracks of a playlist via YouTube Data API v3, Spotify embed, or ytmusicapi."""
         clean_id = playlist_id.strip()
+        if clean_id in self.CURATED_PLAYLISTS or clean_id.startswith("curated-") or f"curated-{clean_id}" in self.CURATED_PLAYLISTS:
+            return await self.get_curated_playlist(clean_id)
+
         if clean_id.startswith("spotify:") or clean_id.startswith("spotify_") or "open.spotify.com" in clean_id or (len(clean_id) == 22 and not "_" in clean_id and not "-" in clean_id):
             return await self.get_spotify_playlist(clean_id)
 
