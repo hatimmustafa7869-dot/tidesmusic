@@ -16,24 +16,39 @@
     -webkit-user-select: none;
   }
 
-  /* Frosted Glass Scrollbars */
-  ::-webkit-scrollbar {
-    width: 7px;
-    height: 7px;
+  /* Hide scrollbars globally on mobile and touch screens */
+  @media (max-width: 768px), (pointer: coarse) {
+    ::-webkit-scrollbar {
+      display: none !important;
+      width: 0 !important;
+      height: 0 !important;
+    }
+    * {
+      -ms-overflow-style: none !important;
+      scrollbar-width: none !important;
+    }
   }
 
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
+  /* Frosted Glass Scrollbars for Desktop */
+  @media (min-width: 769px) and (pointer: fine) {
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
 
-  ::-webkit-scrollbar-thumb {
-    background-color: rgba(255, 255, 255, 0.16);
-    border-radius: 9999px;
-    transition: background-color 0.2s ease;
-  }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
 
-  ::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(255, 255, 255, 0.32);
+    ::-webkit-scrollbar-thumb {
+      background-color: rgba(255, 255, 255, 0.14);
+      border-radius: 9999px;
+      transition: background-color 0.2s ease;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background-color: rgba(255, 255, 255, 0.3);
+    }
   }
 }
 
@@ -164,13 +179,15 @@
   animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Hide scrollbars for clean carousels */
+/* Hide scrollbars for clean carousels & mobile lists */
 .no-scrollbar::-webkit-scrollbar {
-  display: none;
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 .no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
 }
 
 /* Heart Pop Animation */

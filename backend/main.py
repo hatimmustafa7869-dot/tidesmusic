@@ -16,24 +16,35 @@ from backend.auth import create_access_token, get_current_user, get_optional_use
 from backend.config import settings
 from backend.jam import jam_manager
 from backend.database import (
+    add_batch_tracks_to_playlist,
     add_track_to_playlist,
     add_user_history,
     clear_user_history,
+    create_password_reset_code,
+    create_rolling_backup,
     create_user,
     create_user_playlist,
     delete_user_playlist,
+    export_disaster_recovery_snapshot,
+    export_full_database_json,
+    get_user_by_id,
     get_user_by_username_or_email,
     get_user_favorites,
     get_user_history,
     get_user_playlists,
+    import_full_database_json,
     init_db,
     remove_track_from_playlist,
+    sync_full_user_library,
     toggle_user_favorite,
+    update_user_password,
     update_user_playlist,
+    verify_and_consume_reset_code,
 )
+from backend.email_service import send_password_reset_email
 from backend.yt_service import youtube_service
 
-# Initialize Database Schema
+# Initialize Database Schema, Migrations and Automated Backups
 init_db()
 
 app = FastAPI(
@@ -59,16 +70,13 @@ class LoginRequest(BaseModel):
     identifier: str
     password: str
 
-class CreatePlaylistRequest(BaseModel):
-    id: Optional[str] = None
-    title: str
-    description: Optional[str] = ""
-    thumbnail: Optional[str] = ""
+class ForgotPasswordRequest(BaseModel):
+    email: str
 
-class UpdatePlaylistRequest(BaseModel):
-    title: str
-    description: Optional[str] = None
-    thumbnail: Optional[str] = None
+class ResetPasswordRequest(BaseModel):
+    email: str
+    code: str
+    newPassword: str
 
 class TrackPayload(BaseModel):
     id: str
@@ -77,6 +85,26 @@ class TrackPayload(BaseModel):
     thumbnail: Optional[str] = ""
     duration: Optional[int] = 0
     durationFormatted: Optional[str] = "0:00"
+
+class CreatePlaylistRequest(BaseModel):
+    id: Optional[str] = None
+    title: str
+    description: Optional[str] = ""
+    thumbnail: Optional[str] = ""
+    tracks: Optional[List[TrackPayload]] = None
+
+class UpdatePlaylistRequest(BaseModel):
+    title: str
+    description: Optional[str] = None
+    thumbnail: Optional[str] = None
+
+class BatchTracksRequest(BaseModel):
+    tracks: List[TrackPayload]
+
+class SyncLibraryRequest(BaseModel):
+    localPlaylists: Optional[List[Dict[str, Any]]] = []
+    localFavorites: Optional[List[Dict[str, Any]]] = []
+    localHistory: Optional[List[Dict[str, Any]]] = []
 
 # --- Authentication Endpoints ---
 
@@ -112,6 +140,42 @@ async def login(req: LoginRequest):
 async def get_me(current_user: Dict[str, Any] = Depends(get_current_user)):
     return {"user": current_user}
 
+@app.post("/api/auth/forgot-password")
+async def forgot_password_endpoint(req: ForgotPasswordRequest):
+    email = req.email.strip().lower()
+    if "@" not in email or "." not in email:
+        raise HTTPException(status_code=400, detail="Please enter a valid email address")
+
+    user = get_user_by_username_or_email(email)
+    if not user:
+        return {"success": True, "message": "If this email is registered, a 6-digit verification code has been sent."}
+
+    # Generate secure 6-digit verification code
+    code = f"{random.randint(100000, 999999)}"
+    create_password_reset_code(email, code, expires_minutes=15)
+
+    # Dispatch email via Hostinger SMTP (smtp.hostinger.com)
+    result = send_password_reset_email(email, code)
+    return result
+
+@app.post("/api/auth/reset-password")
+async def reset_password_endpoint(req: ResetPasswordRequest):
+    email = req.email.strip().lower()
+    code = req.code.strip()
+    if len(req.newPassword) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    valid = verify_and_consume_reset_code(email, code)
+    if not valid:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification code. Please request a new code.")
+
+    pw_hash = hash_password(req.newPassword)
+    updated = update_user_password(email, pw_hash)
+    if not updated:
+        raise HTTPException(status_code=404, detail="User account not found")
+
+    return {"success": True, "message": "Password successfully reset! You can now log in with your new password."}
+
 # --- Cloud-Synced User Playlists (Hostinger Persistence) ---
 
 @app.get("/api/user/playlists")
@@ -125,12 +189,14 @@ async def create_playlist_endpoint(
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     pid = req.id or f"pl-{uuid.uuid4()}"
+    tracks_data = [t.model_dump() for t in req.tracks] if req.tracks else None
     pl = create_user_playlist(
         playlist_id=pid,
         user_id=current_user["id"],
         title=req.title.strip(),
         description=req.description or "",
-        thumbnail=req.thumbnail or ""
+        thumbnail=req.thumbnail or "",
+        tracks=tracks_data
     )
     return {"playlist": pl}
 
@@ -172,6 +238,19 @@ async def add_track_endpoint(
         raise HTTPException(status_code=404, detail="Playlist not found")
     return {"status": "ok"}
 
+@app.post("/api/user/playlists/{playlist_id}/batch-tracks")
+async def batch_add_tracks_endpoint(
+    playlist_id: str,
+    req: BatchTracksRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    count = add_batch_tracks_to_playlist(
+        playlist_id=playlist_id,
+        user_id=current_user["id"],
+        tracks=[t.model_dump() for t in req.tracks]
+    )
+    return {"status": "ok", "addedCount": count}
+
 @app.delete("/api/user/playlists/{playlist_id}/tracks/{track_id}")
 async def remove_track_endpoint(
     playlist_id: str,
@@ -184,6 +263,46 @@ async def remove_track_endpoint(
         user_id=current_user["id"]
     )
     return {"status": "ok"}
+
+# --- Full User Library Sync (Merges Guest Playlists on Sign In) ---
+
+@app.post("/api/user/sync")
+async def sync_library_endpoint(
+    req: SyncLibraryRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    result = sync_full_user_library(
+        user_id=current_user["id"],
+        local_playlists=req.localPlaylists or [],
+        local_favorites=req.localFavorites or [],
+        local_history=req.localHistory or []
+    )
+    return result
+
+# --- Database Backup & Admin Disaster Recovery ---
+
+@app.get("/api/admin/export-database")
+async def export_database_endpoint():
+    data = export_full_database_json()
+    return data
+
+@app.post("/api/admin/restore-database")
+async def restore_database_endpoint(req: Dict[str, Any]):
+    counts = import_full_database_json(req)
+    return {"status": "ok", "restored": counts}
+
+@app.get("/api/admin/database-status")
+async def database_status_endpoint():
+    db_path = settings.DATABASE_PATH
+    exists = os.path.exists(db_path)
+    size_bytes = os.path.getsize(db_path) if exists else 0
+    return {
+        "status": "healthy",
+        "databasePath": db_path,
+        "exists": exists,
+        "sizeBytes": size_bytes,
+        "backupAvailable": os.path.exists(os.path.join(os.path.dirname(db_path), "tides_disaster_recovery.json"))
+    }
 
 # --- Cloud-Synced User Favorites & History ---
 

@@ -196,7 +196,7 @@ export const MainApp: React.FC = () => {
         {/* Center: Main Content Panel (Glassmorphic Container with top specular highlight) */}
         <div className="flex-1 flex flex-col h-full min-w-0 bg-[#0b0e17]/65 backdrop-blur-3xl rounded-none md:rounded-3xl overflow-hidden relative border-0 md:border md:border-white/[0.12] shadow-none md:shadow-[0_16px_48px_rgba(0,0,0,0.6)]">
           <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/25 to-transparent pointer-events-none z-20" />
-          <main className="flex-1 overflow-y-auto px-3 sm:px-4 md:px-7 py-2 sm:py-4 pb-36 md:pb-8">
+          <main className="flex-1 overflow-y-auto no-scrollbar px-3 sm:px-4 md:px-7 py-2 sm:py-4 pb-36 md:pb-8">
             {currentView === 'home' && (
               <HomePage
                 onSelectPlaylist={handleSelectPlaylist}

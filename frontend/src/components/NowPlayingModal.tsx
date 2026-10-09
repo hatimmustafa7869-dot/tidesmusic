@@ -182,13 +182,18 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({ isOpen, onClos
     return idx;
   }, [parsedLyrics, currentTime]);
 
-  // Auto-scroll active lyric into view
+  // Auto-scroll active lyric into view (ONLY scrolls the lyrics container, never bubbles to parent!)
   useEffect(() => {
     if (isUserScrolling || activeLineIndex === -1 || activeTab !== 'lyrics') return;
-    if (activeLineRef.current) {
-      activeLineRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center'
+    const container = lyricsContainerRef.current;
+    const activeEl = activeLineRef.current;
+    if (container && activeEl) {
+      const lineOffsetTop = activeEl.offsetTop;
+      const containerHeight = container.clientHeight;
+      const targetScrollTop = lineOffsetTop - containerHeight / 2 + activeEl.clientHeight / 2;
+      container.scrollTo({
+        top: Math.max(0, targetScrollTop),
+        behavior: 'smooth'
       });
     }
   }, [activeLineIndex, isUserScrolling, activeTab]);
@@ -207,10 +212,15 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({ isOpen, onClos
   // Jump to active line when user clicks "Back to sync"
   const scrollToActiveLine = () => {
     setIsUserScrolling(false);
-    if (activeLineRef.current) {
-      activeLineRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center'
+    const container = lyricsContainerRef.current;
+    const activeEl = activeLineRef.current;
+    if (container && activeEl) {
+      const lineOffsetTop = activeEl.offsetTop;
+      const containerHeight = container.clientHeight;
+      const targetScrollTop = lineOffsetTop - containerHeight / 2 + activeEl.clientHeight / 2;
+      container.scrollTo({
+        top: Math.max(0, targetScrollTop),
+        behavior: 'smooth'
       });
     }
   };
@@ -279,18 +289,18 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({ isOpen, onClos
         ))}
       </div>
 
-      {/* 2. Top Header Bar */}
-      <div className="relative z-20 flex items-center justify-between px-6 py-4 border-b border-white/5 backdrop-blur-md bg-black/20">
+      {/* 2. Top Header Bar (Permanently Anchored at Top with Safe Area Padding) */}
+      <header className="shrink-0 relative z-30 flex items-center justify-between px-3 sm:px-6 pt-[max(env(safe-area-inset-top),22px)] sm:pt-4 pb-2.5 border-b border-white/[0.08] backdrop-blur-3xl bg-[#080b12]/95 shadow-md">
         <button
           onClick={onClose}
-          className="flex items-center gap-2 text-zinc-300 hover:text-white transition px-3.5 py-1.5 rounded-full hover:bg-white/10 active:scale-95 group shadow-sm"
+          className="flex items-center gap-1.5 text-zinc-300 hover:text-white transition px-3 py-1.5 rounded-full hover:bg-white/10 active:scale-95 group shadow-sm shrink-0"
         >
-          <ChevronDown className="w-5 h-5 group-hover:translate-y-0.5 transition-transform" />
+          <ChevronDown className="w-5 h-5 text-white group-hover:translate-y-0.5 transition-transform" />
           <span className="text-xs font-bold uppercase tracking-wider">Close</span>
         </button>
 
-        {/* Brand Status Indicator */}
-        <div className="flex items-center gap-2">
+        {/* Brand Status Indicator (Visible on tablet/desktop) */}
+        <div className="hidden md:flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-[#1ed760] animate-ping' : 'bg-zinc-500'}`} />
           <span className="text-xs uppercase tracking-widest text-zinc-300 font-extrabold flex items-center gap-1.5">
             Playing on <span className="text-[#1ed760] font-black">Tides Music</span>
@@ -298,36 +308,36 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({ isOpen, onClos
         </div>
 
         {/* Tab Switcher & Jam Action */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <div className="flex items-center gap-1 bg-black/60 p-1 rounded-full border border-white/10 shadow-inner">
             <button
               onClick={() => setActiveTab('lyrics')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 ${
+              className={`flex items-center gap-1 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full text-xs font-bold transition-all duration-200 ${
                 activeTab === 'lyrics'
-                  ? 'bg-[#1ed760] text-black shadow-[0_0_15px_rgba(30,215,96,0.35)] scale-102'
+                  ? 'bg-[#1ed760] text-black shadow-[0_0_15px_rgba(30,215,96,0.35)] scale-102 font-black'
                   : 'text-zinc-400 hover:text-white'
               }`}
             >
               <Mic2 className="w-3.5 h-3.5" />
-              Lyrics
+              <span>Lyrics</span>
             </button>
             <button
               onClick={() => setActiveTab('queue')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 ${
+              className={`flex items-center gap-1 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full text-xs font-bold transition-all duration-200 ${
                 activeTab === 'queue'
-                  ? 'bg-[#1ed760] text-black shadow-[0_0_15px_rgba(30,215,96,0.35)] scale-102'
+                  ? 'bg-[#1ed760] text-black shadow-[0_0_15px_rgba(30,215,96,0.35)] scale-102 font-black'
                   : 'text-zinc-400 hover:text-white'
               }`}
             >
               <ListMusic className="w-3.5 h-3.5" />
-              Queue ({queue.length})
+              <span>Queue ({queue.length})</span>
             </button>
           </div>
 
           {/* Collaborative Jam Session Button */}
           <button
             onClick={() => setIsJamModalOpen(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-bold transition ${
               isJamActive
                 ? 'bg-[#1ed760] text-black shadow-[0_0_12px_rgba(30,215,96,0.5)]'
                 : 'bg-black/60 hover:bg-white/10 text-zinc-300 hover:text-white border border-white/10'
@@ -335,13 +345,13 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({ isOpen, onClos
             title={isJamActive ? `In Jam (${participants.length} listeners)` : 'Start or Join a Jam'}
           >
             <Radio className="w-3.5 h-3.5 text-[#1ed760]" />
-            <span>{isJamActive ? `Jam (${participants.length})` : 'Jam'}</span>
+            <span className="hidden sm:inline">{isJamActive ? `Jam (${participants.length})` : 'Jam'}</span>
           </button>
         </div>
-      </div>
+      </header>
 
       {/* 3. Main Split View: Left Column (Art & Controls) + Right Column (Clickable Lyrics / Queue) */}
-      <div className="relative z-10 flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 p-6 md:p-10 lg:p-12 overflow-y-auto overflow-x-hidden max-w-7xl mx-auto w-full items-center">
+      <div className="relative z-10 flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 p-4 sm:p-6 md:p-10 lg:p-12 overflow-y-auto no-scrollbar max-w-7xl mx-auto w-full items-center">
         {/* LEFT COLUMN: Album Artwork & Comprehensive Playback Controls */}
         <div className="flex flex-col items-center justify-center max-w-md mx-auto w-full space-y-6">
           {/* Cover Art with Vinyl Glow Effect */}
@@ -630,7 +640,7 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({ isOpen, onClos
               <div
                 ref={lyricsContainerRef}
                 onScroll={handleLyricsScroll}
-                className="flex-1 overflow-y-auto space-y-4 pr-3 pt-2 pb-16 scroll-smooth scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
+                className="flex-1 overflow-y-auto space-y-4 pr-3 pt-2 pb-16 scroll-smooth no-scrollbar"
               >
                 {lyricsLoading ? (
                   <div className="flex flex-col items-center justify-center h-full text-zinc-400 gap-3">
@@ -727,7 +737,7 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({ isOpen, onClos
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-1.5 pr-2 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+              <div className="flex-1 overflow-y-auto space-y-1.5 pr-2 no-scrollbar">
                 {queue.map((track, idx) => {
                   const isCurrent = idx === queueIndex;
                   return (
