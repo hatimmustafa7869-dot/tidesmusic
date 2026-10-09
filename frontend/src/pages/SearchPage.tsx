@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, Play } from 'lucide-react';
+import { Loader2, Play, Search, X } from 'lucide-react';
 import { TrackCard } from '../components/TrackCard';
 import { TrackRow } from '../components/TrackRow';
 import { useAudio } from '../context/AudioContext';
@@ -17,7 +17,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
   onSelectPlaylist,
   onOpenAddToPlaylist
 }) => {
-  const { playTrack } = useAudio();
+  const { playPlaylist } = useAudio();
   const [query, setQuery] = useState(initialQuery);
   const [filter, setFilter] = useState<'all' | 'songs' | 'playlists'>('all');
   const [results, setResults] = useState<any[]>([]);
@@ -94,9 +94,48 @@ export const SearchPage: React.FC<SearchPageProps> = ({
   const topResult = songs[0];
 
   return (
-    <div className="space-y-6 pb-28 animate-fade-in-up">
+    <div className="space-y-5 pb-28 animate-fade-in-up">
+      {/* Mobile Search Bar (< md) with Instant Clear */}
+      <div className="md:hidden relative flex items-center bg-white/[0.08] hover:bg-white/[0.12] focus-within:bg-white/[0.14] border border-white/[0.14] focus-within:border-[#1ed760] rounded-2xl px-3.5 py-2.5 backdrop-blur-2xl transition shadow-inner">
+        <Search className="w-4.5 h-4.5 text-zinc-400 mr-2.5 shrink-0" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => {
+            const val = e.target.value;
+            setQuery(val);
+            if (!val.trim()) {
+              activeSearchIdRef.current++;
+              setResults([]);
+              setError('');
+              setLoading(false);
+            } else {
+              executeSearch(val, filter);
+            }
+          }}
+          placeholder="What do you want to play?"
+          className="w-full bg-transparent text-sm text-white placeholder-zinc-400 focus:outline-none"
+          autoFocus={!initialQuery}
+        />
+        {query && (
+          <button
+            onClick={() => {
+              setQuery('');
+              activeSearchIdRef.current++;
+              setResults([]);
+              setError('');
+              setLoading(false);
+            }}
+            className="p-1 text-zinc-400 hover:text-white"
+            title="Clear search"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
       {/* Category Filter Pills */}
-      <div className="flex items-center gap-2 pb-2">
+      <div className="flex items-center gap-2 pb-1">
         <button
           onClick={() => handleFilterChange('all')}
           className={`px-3 py-1.5 rounded-full text-xs font-bold transition ${
@@ -181,7 +220,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
             <div className="lg:col-span-5 space-y-3">
               <h2 className="text-xl font-black text-white">Top result</h2>
               <div
-                onClick={() => playTrack(topResult)}
+                onClick={() => playPlaylist(songs, 0)}
                 className="group relative p-5 rounded-md bg-[#181818] hover:bg-[#282828] cursor-pointer transition select-none flex flex-col justify-between h-[230px]"
               >
                 <div className="space-y-4">

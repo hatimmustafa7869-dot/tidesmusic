@@ -126,8 +126,17 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [shuffle, setShuffle] = useState<boolean>(false);
   const [repeat, setRepeat] = useState<RepeatMode>('off');
 
+  const queueRef = useRef<Track[]>(queue);
+  const queueIndexRef = useRef<number>(queueIndex);
+  const shuffleRef = useRef<boolean>(shuffle);
+  const nextTrackRef = useRef<() => void>(() => {});
+  const prevTrackRef = useRef<() => void>(() => {});
+
   currentTrackRef.current = currentTrack;
   repeatRef.current = repeat;
+  queueRef.current = queue;
+  queueIndexRef.current = queueIndex;
+  shuffleRef.current = shuffle;
 
   // Initialize YouTube IFrame Player API
   useEffect(() => {
@@ -187,7 +196,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                   event.target.seekTo(0, true);
                   event.target.playVideo();
                 } else {
-                  nextTrack();
+                  nextTrackRef.current();
                 }
               } else if (event.data === 3) {
                 // 3: BUFFERING
@@ -348,7 +357,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         audio.play().catch(console.error);
         return;
       }
-      nextTrack();
+      nextTrackRef.current();
     };
 
     audio.addEventListener('ended', handleEnded);
@@ -465,8 +474,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       navigator.mediaSession.playbackState = 'paused';
     });
 
-    navigator.mediaSession.setActionHandler('previoustrack', () => prevTrack());
-    navigator.mediaSession.setActionHandler('nexttrack', () => nextTrack());
+    navigator.mediaSession.setActionHandler('previoustrack', () => prevTrackRef.current());
+    navigator.mediaSession.setActionHandler('nexttrack', () => nextTrackRef.current());
     navigator.mediaSession.setActionHandler('seekto', (details) => {
       if (details.seekTime !== undefined) seek(details.seekTime);
     });
@@ -524,8 +533,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
         setIsPlaying(false);
       },
-      next: () => nextTrack(),
-      prev: () => prevTrack(),
+      next: () => nextTrackRef.current(),
+      prev: () => prevTrackRef.current(),
       seek: (sec: number) => seek(sec)
     };
 
@@ -533,8 +542,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const action = e.detail?.action;
       if (action === 'play') (window as any).AndroidControls?.play();
       else if (action === 'pause') (window as any).AndroidControls?.pause();
-      else if (action === 'next') nextTrack();
-      else if (action === 'prev') prevTrack();
+      else if (action === 'next') nextTrackRef.current();
+      else if (action === 'prev') prevTrackRef.current();
     };
 
     window.addEventListener('nativeMediaControl', handleNativeControl);
@@ -722,29 +731,38 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const playTrack = (track: Track, newQueue?: Track[]) => {
     if (newQueue && newQueue.length > 0) {
       setQueue(newQueue);
+      queueRef.current = newQueue;
       const idx = newQueue.findIndex(t => t.id === track.id);
-      setQueueIndex(idx !== -1 ? idx : 0);
+      const targetIdx = idx !== -1 ? idx : 0;
+      setQueueIndex(targetIdx);
+      queueIndexRef.current = targetIdx;
     } else {
-      const existingIdx = queue.findIndex(t => t.id === track.id);
+      const existingIdx = queueRef.current.findIndex(t => t.id === track.id);
       if (existingIdx !== -1) {
         setQueueIndex(existingIdx);
+        queueIndexRef.current = existingIdx;
       } else {
-        const nextQ = [track, ...queue];
+        // Fresh standalone track play: reset queue so stale leftover tracks are cleared
+        const nextQ = [track];
         setQueue(nextQ);
+        queueRef.current = nextQ;
         setQueueIndex(0);
+        queueIndexRef.current = 0;
       }
     }
     loadAndPlayTrack(track);
     if (!isSyncingFromRemoteRef.current) {
-      playbackEventListenerRef.current?.({ type: 'PLAY_TRACK', track, queue: newQueue || queue });
+      playbackEventListenerRef.current?.({ type: 'PLAY_TRACK', track, queue: newQueue || queueRef.current });
     }
   };
 
   const playPlaylist = (tracks: Track[], startIndex: number = 0) => {
     if (!tracks || tracks.length === 0) return;
     setQueue(tracks);
+    queueRef.current = tracks;
     const validIndex = Math.max(0, Math.min(startIndex, tracks.length - 1));
     setQueueIndex(validIndex);
+    queueIndexRef.current = validIndex;
     loadAndPlayTrack(tracks[validIndex]);
     if (!isSyncingFromRemoteRef.current) {
       playbackEventListenerRef.current?.({ type: 'PLAY_TRACK', track: tracks[validIndex], queue: tracks, queue_index: validIndex });
@@ -775,33 +793,41 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const nextTrack = async () => {
-    if (queue.length === 0) return;
+    const currentQ = queueRef.current;
+    const currentIdx = queueIndexRef.current;
+    if (currentQ.length === 0) return;
 
-    if (shuffle && queue.length > 1) {
-      let randIdx = Math.floor(Math.random() * queue.length);
-      while (randIdx === queueIndex && queue.length > 1) {
-        randIdx = Math.floor(Math.random() * queue.length);
+    if (shuffleRef.current && currentQ.length > 1) {
+      let randIdx = Math.floor(Math.random() * currentQ.length);
+      while (randIdx === currentIdx && currentQ.length > 1) {
+        randIdx = Math.floor(Math.random() * currentQ.length);
       }
       setQueueIndex(randIdx);
-      loadAndPlayTrack(queue[randIdx]);
+      queueIndexRef.current = randIdx;
+      loadAndPlayTrack(currentQ[randIdx]);
       return;
     }
 
-    const nextIdx = queueIndex + 1;
-    if (nextIdx < queue.length) {
+    const nextIdx = currentIdx + 1;
+    if (nextIdx < currentQ.length) {
       setQueueIndex(nextIdx);
-      loadAndPlayTrack(queue[nextIdx]);
+      queueIndexRef.current = nextIdx;
+      loadAndPlayTrack(currentQ[nextIdx]);
     } else {
-      if (repeat === 'all') {
+      if (repeatRef.current === 'all') {
         setQueueIndex(0);
-        loadAndPlayTrack(queue[0]);
-      } else if (currentTrack) {
+        queueIndexRef.current = 0;
+        loadAndPlayTrack(currentQ[0]);
+      } else if (currentTrackRef.current) {
         setIsLoading(true);
         try {
-          const upNext = await api.getUpNext(currentTrack.id);
+          const upNext = await api.getUpNext(currentTrackRef.current.id);
           if (upNext.length > 0) {
-            setQueue(prev => [...prev, ...upNext]);
+            const merged = [...queueRef.current, ...upNext];
+            setQueue(merged);
+            queueRef.current = merged;
             setQueueIndex(nextIdx);
+            queueIndexRef.current = nextIdx;
             loadAndPlayTrack(upNext[0]);
           } else {
             setIsLoading(false);
@@ -818,17 +844,24 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       seek(0);
       return;
     }
-    if (queue.length === 0) return;
+    const currentQ = queueRef.current;
+    const currentIdx = queueIndexRef.current;
+    if (currentQ.length === 0) return;
 
-    const prevIdx = queueIndex - 1;
+    const prevIdx = currentIdx - 1;
     if (prevIdx >= 0) {
       setQueueIndex(prevIdx);
-      loadAndPlayTrack(queue[prevIdx]);
+      queueIndexRef.current = prevIdx;
+      loadAndPlayTrack(currentQ[prevIdx]);
     } else {
       setQueueIndex(0);
-      if (queue[0]) loadAndPlayTrack(queue[0]);
+      queueIndexRef.current = 0;
+      if (currentQ[0]) loadAndPlayTrack(currentQ[0]);
     }
   };
+
+  nextTrackRef.current = nextTrack;
+  prevTrackRef.current = prevTrack;
 
   const seek = (seconds: number) => {
     const validSec = Math.max(0, isNaN(seconds) ? 0 : seconds);

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AuthModal } from './components/AuthModal';
+import { BottomNav } from './components/BottomNav';
 import { DownloadAppModal } from './components/DownloadAppModal';
 import { JamModal } from './components/JamModal';
 import { Navbar } from './components/Navbar';
@@ -11,7 +12,7 @@ import { QueueDrawer } from './components/QueueDrawer';
 import { Sidebar } from './components/Sidebar';
 import { AudioProvider, useAudio } from './context/AudioContext';
 import { AuthProvider } from './context/AuthContext';
-import { JamProvider } from './context/JamContext';
+import { JamProvider, useJam } from './context/JamContext';
 import { LibraryProvider } from './context/LibraryContext';
 import { FavoritesPage } from './pages/FavoritesPage';
 import { HistoryPage } from './pages/HistoryPage';
@@ -22,6 +23,7 @@ import type { Track } from './types';
 
 export const MainApp: React.FC = () => {
   const [currentView, setCurrentView] = useState<'home' | 'search' | 'playlist' | 'favorites' | 'history'>('home');
+  const [homeCategory, setHomeCategory] = useState<'all' | 'songs' | 'playlists'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>('');
 
@@ -39,6 +41,7 @@ export const MainApp: React.FC = () => {
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
 
   const { togglePlay, seek, currentTime, duration, setVolume, volume, toggleMute, nextTrack, prevTrack } = useAudio();
+  const { isJamActive, setIsJamModalOpen } = useJam();
 
   // Keyboard Shortcuts (Spotify Standard)
   useEffect(() => {
@@ -157,7 +160,7 @@ export const MainApp: React.FC = () => {
       <div className="pointer-events-none fixed -bottom-40 -right-40 w-[620px] h-[620px] bg-gradient-to-tl from-emerald-500/20 via-teal-600/15 to-transparent rounded-full blur-[140px] z-0" />
       <div className="pointer-events-none fixed top-1/4 right-1/3 w-[520px] h-[520px] bg-gradient-to-tr from-cyan-500/15 via-blue-600/10 to-transparent rounded-full blur-[160px] z-0" />
 
-      {/* 1. Spotify Global Desktop Top Bar */}
+      {/* 1. Spotify Global Desktop Top Bar / Mobile Header */}
       <Navbar
         onSearch={handleSearch}
         onNavigateHome={() => handleNavigate('home')}
@@ -171,10 +174,13 @@ export const MainApp: React.FC = () => {
         canGoForward={navIndex < navHistory.length - 1}
         onGoBack={handleGoBack}
         onGoForward={handleGoForward}
+        currentView={currentView}
+        activeCategory={homeCategory}
+        onSelectCategory={setHomeCategory}
       />
 
       {/* 2. Main 3-Pane Desktop Layout: Left Sidebar + Center Content + Right Now Playing Sidebar */}
-      <div className="relative z-10 flex-1 flex overflow-hidden p-1.5 sm:px-3 sm:pb-3 gap-3 min-h-0">
+      <div className="relative z-10 flex-1 flex overflow-hidden p-0 md:p-1.5 md:px-3 md:pb-3 gap-0 md:gap-3 min-h-0">
         {/* Left: Your Library Sidebar */}
         <Sidebar
           currentView={currentView}
@@ -188,14 +194,16 @@ export const MainApp: React.FC = () => {
         />
 
         {/* Center: Main Content Panel (Glassmorphic Container with top specular highlight) */}
-        <div className="flex-1 flex flex-col h-full min-w-0 bg-[#0b0e17]/65 backdrop-blur-3xl rounded-3xl overflow-hidden relative border border-white/[0.12] shadow-[0_16px_48px_rgba(0,0,0,0.6)]">
+        <div className="flex-1 flex flex-col h-full min-w-0 bg-[#0b0e17]/65 backdrop-blur-3xl rounded-none md:rounded-3xl overflow-hidden relative border-0 md:border md:border-white/[0.12] shadow-none md:shadow-[0_16px_48px_rgba(0,0,0,0.6)]">
           <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/25 to-transparent pointer-events-none z-20" />
-          <main className="flex-1 overflow-y-auto px-3 sm:px-4 md:px-7 py-3 sm:py-4">
+          <main className="flex-1 overflow-y-auto px-3 sm:px-4 md:px-7 py-2 sm:py-4 pb-36 md:pb-8">
             {currentView === 'home' && (
               <HomePage
                 onSelectPlaylist={handleSelectPlaylist}
                 onOpenAddToPlaylist={handleOpenAddToPlaylist}
                 onNavigateFavorites={() => setCurrentView('favorites')}
+                category={homeCategory}
+                onSelectCategory={setHomeCategory}
               />
             )}
 
@@ -246,6 +254,16 @@ export const MainApp: React.FC = () => {
         isQueueOpen={isQueueOpen}
         isRightSidebarOpen={isRightSidebarOpen}
         onToggleRightSidebar={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
+      />
+
+      {/* 4. Spotify Mobile Bottom Navigation Bar */}
+      <BottomNav
+        currentView={currentView}
+        onNavigate={handleNavigate}
+        onOpenJam={() => setIsJamModalOpen(true)}
+        onOpenCreate={() => setPlaylistModalMode('create')}
+        onOpenLibrary={() => setIsMobileSidebarOpen(true)}
+        isJamActive={isJamActive}
       />
 
       {/* Slide-out Queue Drawer */}

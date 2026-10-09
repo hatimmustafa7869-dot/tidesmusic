@@ -164,6 +164,15 @@
   animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Hide scrollbars for clean carousels */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Heart Pop Animation */
 @keyframes heart-pop {
   0% { transform: scale(1); }

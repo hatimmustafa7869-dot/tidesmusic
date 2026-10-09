@@ -1099,18 +1099,36 @@ app.get('/api/playlist/:id', async (req, res) => {
 app.get('/api/upnext/:videoId', async (req, res) => {
   const { videoId } = req.params;
   try {
-    const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&relatedToVideoId=${videoId}&type=video&maxResults=10&key=${YOUTUBE_API_KEY}`;
-    const sRes = await fetch(searchUrl);
-    const data = await sRes.json();
-    const tracks = (data.items || []).map(item => ({
-      id: item.id?.videoId,
-      title: item.snippet?.title || '',
-      artist: item.snippet?.channelTitle || '',
-      thumbnail: item.snippet?.thumbnails?.high?.url || '',
-      type: 'song'
-    }));
+    let query = '';
+    if (videoId.startsWith('sp__')) {
+      const parts = videoId.split('__');
+      query = decodeURIComponent(parts[2] || '') + ' ' + decodeURIComponent(parts[3] || '');
+    } else {
+      // 1. Try to get title & artist from YouTube Data API
+      try {
+        const vUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${YOUTUBE_API_KEY}`;
+        const vRes = await fetch(vUrl);
+        const vData = await vRes.json();
+        const item = (vData.items || [])[0];
+        if (item?.snippet?.title) {
+          query = item.snippet.title.replace(/\(.*?\)|\[.*?\]/g, '').trim() + ' ' + (item.snippet.channelTitle || '').replace(/ - Topic|VEVO/g, '').trim();
+        }
+      } catch {}
+    }
+
+    if (!query) {
+      query = 'trending top music songs';
+    }
+
+    // 2. Fetch related songs using scrapeSearch (zero quota, highly relevant songs)
+    const results = await scrapeSearch(query + ' songs');
+    const tracks = results
+      .filter(t => t.id !== videoId && t.duration >= 60)
+      .slice(0, 15);
+
     res.json({ tracks });
-  } catch {
+  } catch (err) {
+    console.error('Upnext recommendation error:', err.message);
     res.json({ tracks: [] });
   }
 });

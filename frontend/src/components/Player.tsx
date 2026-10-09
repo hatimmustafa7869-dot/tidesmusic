@@ -86,23 +86,7 @@ export const Player: React.FC<PlayerProps> = ({
   const volumePercent = isMuted ? 0 : volume * 100;
 
   return (
-    <div className="relative z-40 bg-[#090d16]/85 backdrop-blur-3xl border-t border-white/[0.12] select-none text-white shrink-0 shadow-[0_-12px_40px_rgba(0,0,0,0.7)]">
-      {/* Top Edge Progress Bar for Mobile */}
-      <div
-        className="md:hidden absolute top-0 left-0 right-0 h-[2.5px] bg-white/[0.08] cursor-pointer"
-        onClick={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          const clickX = e.clientX - rect.left;
-          const ratio = Math.max(0, Math.min(1, clickX / rect.width));
-          seek(ratio * (duration || 0));
-        }}
-      >
-        <div
-          className="h-full bg-[#1ed760] transition-all duration-75"
-          style={{ width: `${progressPercent}%` }}
-        />
-      </div>
-
+    <div className="relative z-40 bg-transparent md:bg-[#090d16]/85 md:backdrop-blur-3xl md:border-t md:border-white/[0.12] select-none text-white shrink-0 md:shadow-[0_-12px_40px_rgba(0,0,0,0.7)]">
       {/* Floating Active Jam Sync Pill */}
       {isJamActive && (
         <div
@@ -116,76 +100,87 @@ export const Player: React.FC<PlayerProps> = ({
         </div>
       )}
 
-      {/* 1. Mobile Player View (< md) */}
-      <div className="md:hidden flex items-center justify-between h-16 px-3 gap-2">
-        {/* Track Details & Thumbnail (Click to open Fullscreen Now Playing) */}
-        <div
-          onClick={onOpenNowPlaying}
-          className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer py-1"
-        >
-          <div className="relative w-11 h-11 rounded overflow-hidden shrink-0 shadow bg-[#282828]">
-            <img
-              src={currentTrack.thumbnail || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80'}
-              alt={currentTrack.title}
-              className="w-full h-full object-cover"
+      {/* 1. Mobile Floating Mini Player (< md) matching Spotify Screenshot */}
+      <div className="md:hidden px-2 pt-1 pb-1">
+        <div className="relative flex items-center justify-between h-14 px-2.5 rounded-2xl bg-[#0f1422]/90 backdrop-blur-3xl border border-white/[0.14] shadow-[0_10px_30px_rgba(0,0,0,0.7)] gap-2 overflow-hidden">
+          {/* Bottom Progress Bar */}
+          <div
+            className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/[0.08] cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              const rect = e.currentTarget.getBoundingClientRect();
+              const clickX = e.clientX - rect.left;
+              const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+              seek(ratio * (duration || 0));
+            }}
+          >
+            <div
+              className="h-full bg-[#1ed760] transition-all duration-75"
+              style={{ width: `${progressPercent}%` }}
             />
           </div>
 
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-white truncate">
-              <span className="truncate">{currentTrack.title}</span>
-              <Equalizer isPlaying={isPlaying} className="w-3 h-3 shrink-0" />
+          {/* Track Details & Thumbnail */}
+          <div
+            onClick={onOpenNowPlaying}
+            className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer py-1"
+          >
+            <div className="relative w-10 h-10 rounded-xl overflow-hidden shrink-0 shadow bg-black/40 border border-white/10">
+              <img
+                src={currentTrack.thumbnail || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80'}
+                alt={currentTrack.title}
+                className="w-full h-full object-cover"
+              />
             </div>
-            <div className="text-[11px] text-zinc-400 truncate mt-0.5">
-              {currentTrack.artist || 'Unknown Artist'}
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-white truncate">
+                <span className="truncate">{currentTrack.title}</span>
+                <Equalizer isPlaying={isPlaying} className="w-3 h-3 shrink-0" />
+              </div>
+              <div className="text-[11px] text-zinc-400 truncate mt-0.5 font-medium">
+                {currentTrack.artist || 'Unknown Artist'}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Mobile Action Controls: Jam, Like, Play/Pause, Next */}
-        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
-          <button
-            onClick={() => setIsJamModalOpen(true)}
-            className={`p-1.5 transition ${isJamActive ? 'text-[#1ed760]' : 'text-zinc-400 hover:text-white'}`}
-            title="Start or Join a Jam"
-          >
-            <Radio className="w-4 h-4" />
-          </button>
+          {/* Mobile Action Controls: Jam, Like, Play/Pause */}
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => setIsJamModalOpen(true)}
+              className={`p-1.5 transition ${isJamActive ? 'text-[#1ed760]' : 'text-zinc-400 hover:text-white'}`}
+              title="Start or Join a Jam"
+            >
+              <Radio className="w-4 h-4" />
+            </button>
 
-          <button
-            onClick={() => toggleFavorite(currentTrack)}
-            className="p-1.5 transition active:scale-125 text-[#1ed760]"
-            title={isFav ? 'Added to Liked Songs' : 'Save to Liked Songs'}
-          >
-            {isFav ? (
-              <CheckCircle2 className="w-5 h-5 fill-[#1ed760] text-black" />
-            ) : (
-              <Heart className="w-5 h-5 text-zinc-400 hover:text-white" />
-            )}
-          </button>
+            <button
+              onClick={() => toggleFavorite(currentTrack)}
+              className="p-1.5 transition active:scale-125 text-[#1ed760]"
+              title={isFav ? 'Added to Liked Songs' : 'Save to Liked Songs'}
+            >
+              {isFav ? (
+                <CheckCircle2 className="w-5 h-5 fill-[#1ed760] text-black" />
+              ) : (
+                <Heart className="w-5 h-5 text-zinc-400 hover:text-white" />
+              )}
+            </button>
 
-          <button
-            onClick={togglePlay}
-            disabled={isLoading}
-            className="w-9 h-9 rounded-full bg-white hover:scale-105 active:scale-95 text-black flex items-center justify-center transition shadow-lg shrink-0"
-            title={isPlaying ? 'Pause' : 'Play'}
-          >
-            {isLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin text-black" />
-            ) : isPlaying ? (
-              <Pause className="w-4 h-4 fill-current text-black" />
-            ) : (
-              <Play className="w-4 h-4 fill-current text-black ml-0.5" />
-            )}
-          </button>
-
-          <button
-            onClick={nextTrack}
-            className="p-1.5 text-zinc-300 hover:text-white transition active:scale-110"
-            title="Next track"
-          >
-            <SkipForward className="w-5 h-5 fill-current" />
-          </button>
+            <button
+              onClick={togglePlay}
+              disabled={isLoading}
+              className="w-9 h-9 rounded-full bg-white hover:scale-105 active:scale-95 text-black flex items-center justify-center transition shadow-lg shrink-0 ml-1"
+              title={isPlaying ? 'Pause' : 'Play'}
+            >
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin text-black" />
+              ) : isPlaying ? (
+                <Pause className="w-4 h-4 fill-current text-black" />
+              ) : (
+                <Play className="w-4 h-4 fill-current text-black ml-0.5" />
+              )}
+            </button>
+          </div>
         </div>
       </div>
 

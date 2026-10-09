@@ -6,10 +6,19 @@ import type { Track } from '../types';
 interface TrackCardProps {
   item: Track | any;
   onSelectPlaylist?: (playlistId: string) => void;
+  className?: string;
+  tracksContext?: Track[];
+  index?: number;
 }
 
-export const TrackCard: React.FC<TrackCardProps> = ({ item, onSelectPlaylist }) => {
-  const { playTrack, currentTrack, isPlaying } = useAudio();
+export const TrackCard: React.FC<TrackCardProps> = ({
+  item,
+  onSelectPlaylist,
+  className = '',
+  tracksContext,
+  index = 0
+}) => {
+  const { playTrack, playPlaylist, currentTrack, isPlaying } = useAudio();
 
   const isPlaylist = item.type === 'playlist' || !item.duration;
   const isCurrent = currentTrack?.id === item.id;
@@ -17,6 +26,8 @@ export const TrackCard: React.FC<TrackCardProps> = ({ item, onSelectPlaylist }) 
   const handleClick = () => {
     if (isPlaylist) {
       if (onSelectPlaylist) onSelectPlaylist(item.id);
+    } else if (tracksContext && tracksContext.length > 0) {
+      playPlaylist(tracksContext, index);
     } else {
       playTrack(item);
     }
@@ -25,7 +36,7 @@ export const TrackCard: React.FC<TrackCardProps> = ({ item, onSelectPlaylist }) 
   return (
     <div
       onClick={handleClick}
-      className="group relative flex flex-col p-3 rounded-2xl bg-gradient-to-b from-white/[0.08] via-white/[0.03] to-white/[0.015] hover:from-white/[0.14] hover:via-white/[0.07] hover:to-white/[0.03] backdrop-blur-2xl border border-white/[0.1] hover:border-white/[0.25] cursor-pointer transition-all duration-300 select-none hover:-translate-y-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.35)] hover:shadow-[0_16px_36px_rgba(0,0,0,0.6),0_0_24px_rgba(0,210,255,0.12)] overflow-hidden"
+      className={`group relative flex flex-col p-2.5 sm:p-3 rounded-2xl bg-gradient-to-b from-white/[0.08] via-white/[0.03] to-white/[0.015] hover:from-white/[0.14] hover:via-white/[0.07] hover:to-white/[0.03] backdrop-blur-2xl border border-white/[0.1] hover:border-white/[0.25] cursor-pointer transition-all duration-300 select-none hover:-translate-y-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.35)] hover:shadow-[0_16px_36px_rgba(0,0,0,0.6),0_0_24px_rgba(0,210,255,0.12)] overflow-hidden ${className}`}
     >
       {/* Top Specular Edge Line */}
       <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/30 to-transparent pointer-events-none" />

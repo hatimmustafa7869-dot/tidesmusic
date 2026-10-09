@@ -36,10 +36,19 @@ export const TrackRow: React.FC<TrackRowProps> = ({
     }
   };
 
+  const handleRowClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('[role="button"]') || target.closest('a')) {
+      return;
+    }
+    handlePlay();
+  };
+
   return (
     <div
+      onClick={handleRowClick}
       onDoubleClick={handlePlay}
-      className={`group relative flex items-center justify-between px-3 sm:px-4 py-2.5 rounded-2xl transition-all duration-200 select-none ${
+      className={`group relative flex items-center justify-between px-3 sm:px-4 py-2.5 rounded-2xl transition-all duration-200 select-none cursor-pointer ${
         isCurrent
           ? 'bg-gradient-to-r from-white/[0.12] to-white/[0.04] backdrop-blur-xl border border-[#1ed760]/30 shadow-md'
           : 'hover:bg-gradient-to-r hover:from-white/[0.08] hover:to-white/[0.02] hover:backdrop-blur-lg border border-transparent hover:border-white/[0.08]'

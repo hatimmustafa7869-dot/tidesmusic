@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Heart, ListMusic, Loader2, Play } from 'lucide-react';
+import { Heart, ListMusic, Loader2, Play, Sparkles } from 'lucide-react';
 import { TrackCard } from '../components/TrackCard';
 import { TrackRow } from '../components/TrackRow';
 import { useAudio } from '../context/AudioContext';
@@ -11,6 +11,8 @@ interface HomePageProps {
   onSelectPlaylist: (playlistId: string) => void;
   onOpenAddToPlaylist: (track: Track) => void;
   onNavigateFavorites: () => void;
+  category?: 'all' | 'songs' | 'playlists';
+  onSelectCategory?: (c: 'all' | 'songs' | 'playlists') => void;
 }
 
 // Module-level cache so navigating back to Home from playlists or other views is instant
@@ -19,22 +21,32 @@ let cachedHomeData: { shelves: Shelf[]; trending: Track[] } | null = null;
 export const HomePage: React.FC<HomePageProps> = ({
   onSelectPlaylist,
   onOpenAddToPlaylist,
-  onNavigateFavorites
+  onNavigateFavorites,
+  category = 'all',
+  onSelectCategory
 }) => {
   const { playPlaylist, currentTrack, isPlaying } = useAudio();
-  const { playlists, favorites } = useLibrary();
+  const { playlists } = useLibrary();
 
-  const [activeTab, setActiveTab] = useState<'all' | 'songs' | 'playlists'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'songs' | 'playlists'>(category);
   const [shelves, setShelves] = useState<Shelf[]>(() => cachedHomeData?.shelves || []);
   const [trending, setTrending] = useState<Track[]>(() => cachedHomeData?.trending || []);
   const [loading, setLoading] = useState<boolean>(() => !cachedHomeData);
+
+  useEffect(() => {
+    setActiveTab(category);
+  }, [category]);
+
+  const handleTabChange = (tab: 'all' | 'songs' | 'playlists') => {
+    setActiveTab(tab);
+    if (onSelectCategory) onSelectCategory(tab);
+  };
 
   useEffect(() => {
     let mounted = true;
     api.getHome()
       .then(data => {
         if (!mounted) return;
-        // Filter out shorts from trending songs just in case
         const cleanTrending = (data.trending || []).filter(
           (t: Track) => !t.duration || t.duration >= 70
         );
@@ -65,25 +77,58 @@ export const HomePage: React.FC<HomePageProps> = ({
     );
   }
 
-  // Quick Access Grid: Liked Songs + ONLY the user's added playlists
-  const quickCards = [
+  // Curated Fallback mixes to fill Quick Access up to 8 slots
+  const fallbackMixes = [
+    { title: 'Chill Hits', thumb: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&q=80' },
+    { title: 'Top 50 - Global', thumb: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80' },
+    { title: 'Gym & Workout', thumb: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&q=80' },
+    { title: 'Super Hit 90s', thumb: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80' },
+    { title: 'Romantic Melodies', thumb: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=500&q=80' },
+    { title: 'Desi Hip-Hop', thumb: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=500&q=80' },
+    { title: 'Night Drive Vibes', thumb: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=500&q=80' }
+  ];
+
+  // Quick Access 8-Grid (Strictly 2 Columns, 8 Cards matching Spotify Mobile Screenshot)
+  const quickCards: Array<{
+    id: string;
+    title: string;
+    thumbnail: string;
+    isLiked?: boolean;
+    onClick: () => void;
+  }> = [
     {
       id: 'quick-liked',
       title: 'Liked Songs',
       thumbnail: '',
-      count: favorites.length,
       isLiked: true,
       onClick: onNavigateFavorites
     },
-    ...playlists.slice(0, 5).map(pl => ({
+    ...playlists.slice(0, 7).map(pl => ({
       id: pl.id,
       title: pl.title,
       thumbnail: pl.thumbnail || (pl.tracks && pl.tracks.length > 0 ? pl.tracks[0].thumbnail : ''),
-      count: pl.tracks?.length || 0,
-      isLiked: false,
       onClick: () => onSelectPlaylist(pl.id)
     }))
   ];
+
+  // Fill up to 8 slots if user has fewer than 7 playlists
+  let fbIdx = 0;
+  while (quickCards.length < 8 && fbIdx < fallbackMixes.length) {
+    const fb = fallbackMixes[fbIdx];
+    const mixIndex = fbIdx;
+    quickCards.push({
+      id: `quick-fb-${fbIdx}`,
+      title: fb.title,
+      thumbnail: fb.thumb,
+      onClick: () => {
+        if (trending.length > 0) {
+          const start = (mixIndex * 2) % trending.length;
+          playPlaylist(trending, start);
+        }
+      }
+    });
+    fbIdx++;
+  }
 
   // Upcoming Releases shelf (filtered full length tracks)
   const upcomingReleases: Track[] = [
@@ -137,12 +182,14 @@ export const HomePage: React.FC<HomePageProps> = ({
     }
   ];
 
+  const featuredTrack = trending[0] || upcomingReleases[0];
+
   return (
-    <div className="space-y-7 pb-24 animate-fade-in select-none">
-      {/* Category Pills Bar: All, Songs, Playlists */}
-      <div className="flex items-center gap-2 pt-1 pb-3 border-b border-white/[0.08]">
+    <div className="space-y-6 pb-28 animate-fade-in select-none">
+      {/* Desktop Category Pills Bar (Hidden on mobile because it's in the top header) */}
+      <div className="hidden md:flex items-center gap-2 pt-1 pb-3 border-b border-white/[0.08]">
         <button
-          onClick={() => setActiveTab('all')}
+          onClick={() => handleTabChange('all')}
           className={`px-5 py-2 rounded-full text-xs font-bold transition duration-200 ${
             activeTab === 'all'
               ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.3)] font-extrabold scale-105'
@@ -152,17 +199,17 @@ export const HomePage: React.FC<HomePageProps> = ({
           All
         </button>
         <button
-          onClick={() => setActiveTab('songs')}
+          onClick={() => handleTabChange('songs')}
           className={`px-5 py-2 rounded-full text-xs font-bold transition duration-200 ${
             activeTab === 'songs'
               ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.3)] font-extrabold scale-105'
               : 'bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white border border-white/10 backdrop-blur-xl'
           }`}
         >
-          Songs
+          Music
         </button>
         <button
-          onClick={() => setActiveTab('playlists')}
+          onClick={() => handleTabChange('playlists')}
           className={`px-5 py-2 rounded-full text-xs font-bold transition duration-200 ${
             activeTab === 'playlists'
               ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.3)] font-extrabold scale-105'
@@ -173,52 +220,49 @@ export const HomePage: React.FC<HomePageProps> = ({
         </button>
       </div>
 
-      {/* Quick Access 6-Grid (Always visible in All or Songs) */}
+      {/* 1. Quick Access 2-Column Grid (Strictly 2 Columns, 8 Cards matching Spotify Mobile Screenshot) */}
       {(activeTab === 'all' || activeTab === 'songs') && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-1">
           {quickCards.map(item => {
             const isItemPlaying = currentTrack?.id === item.id && isPlaying;
             return (
               <div
                 key={item.id}
                 onClick={item.onClick}
-                className="group relative flex items-center bg-gradient-to-r from-white/[0.08] via-white/[0.04] to-white/[0.02] hover:from-white/[0.14] hover:via-white/[0.08] hover:to-white/[0.04] border border-white/[0.1] hover:border-white/[0.25] rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 select-none pr-3.5 shadow-[0_8px_20px_rgba(0,0,0,0.3)] hover:shadow-[0_16px_36px_rgba(0,0,0,0.5)] backdrop-blur-2xl hover:-translate-y-1"
+                className="group relative flex items-center h-14 bg-white/[0.07] hover:bg-white/[0.13] active:bg-white/[0.18] backdrop-blur-xl border border-white/[0.08] hover:border-white/[0.2] rounded-xl overflow-hidden cursor-pointer transition-all duration-200 select-none shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.5)] active:scale-[0.98]"
               >
-                {/* Top specular hairline */}
+                {/* Specular Edge Line */}
                 <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
 
                 {item.isLiked ? (
-                  <div className="w-16 h-16 bg-gradient-to-br from-[#450af5] via-[#8e2de2] to-[#ff416c] flex items-center justify-center shrink-0 shadow-lg">
-                    <Heart className="w-7 h-7 text-white fill-current drop-shadow-md" />
+                  <div className="w-14 h-14 bg-gradient-to-br from-[#450af5] via-[#8e2de2] to-[#ff416c] flex items-center justify-center shrink-0 shadow-md">
+                    <Heart className="w-6 h-6 text-white fill-current drop-shadow" />
                   </div>
                 ) : item.thumbnail ? (
                   <img
                     src={item.thumbnail}
                     alt={item.title}
-                    className="w-16 h-16 object-cover shrink-0 shadow-lg"
+                    className="w-14 h-14 object-cover shrink-0 shadow-md"
                   />
                 ) : (
-                  <div className="w-16 h-16 bg-gradient-to-tr from-emerald-600 to-teal-800 flex items-center justify-center shrink-0 shadow-lg">
-                    <ListMusic className="w-7 h-7 text-white/90" />
+                  <div className="w-14 h-14 bg-gradient-to-tr from-emerald-600 to-teal-800 flex items-center justify-center shrink-0 shadow-md">
+                    <ListMusic className="w-6 h-6 text-white/90" />
                   </div>
                 )}
 
-                <div className="flex-1 px-4 min-w-0">
-                  <span className="text-sm font-extrabold text-white truncate block tracking-tight">
+                <div className="flex-1 px-2.5 sm:px-3 min-w-0">
+                  <span className="text-xs sm:text-sm font-bold text-white truncate block tracking-tight">
                     {item.title}
-                  </span>
-                  <span className="text-xs text-zinc-400 font-medium block mt-0.5">
-                    {item.count} {item.count === 1 ? 'track' : 'tracks'}
                   </span>
                 </div>
 
-                {/* Floating Spotify Green Play Button */}
+                {/* Floating Play Button on Desktop Hover */}
                 <div
-                  className={`w-11 h-11 rounded-full bg-[#1ed760] text-black flex items-center justify-center shadow-[0_4px_16px_rgba(30,215,96,0.4)] transition-all duration-200 transform group-hover:scale-105 shrink-0 ${
+                  className={`hidden sm:flex mr-3 w-8 h-8 rounded-full bg-[#1ed760] text-black items-center justify-center shadow-[0_2px_12px_rgba(30,215,96,0.4)] transition-all duration-200 transform group-hover:scale-105 shrink-0 ${
                     isItemPlaying ? 'opacity-100 scale-100' : 'opacity-0 group-hover:opacity-100'
                   }`}
                 >
-                  <Play className="w-5 h-5 fill-current ml-0.5 text-black" />
+                  <Play className="w-4 h-4 fill-current ml-0.5 text-black" />
                 </div>
               </div>
             );
@@ -226,13 +270,65 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       )}
 
-      {/* Section 1: Today's Biggest Hits (Prominently at the Top) */}
+      {/* 2. Spotlight / Featured Release Hero Banner (Matching Spotify Mobile Screenshot's Middle Banner) */}
+      {(activeTab === 'all' || activeTab === 'songs') && featuredTrack && (
+        <div
+          onClick={() => {
+            if (trending.length > 0) {
+              playPlaylist(trending, 0);
+            }
+          }}
+          className="relative w-full h-48 sm:h-56 md:h-64 rounded-2xl sm:rounded-3xl overflow-hidden border border-white/[0.14] bg-[#0f1422]/80 backdrop-blur-2xl shadow-[0_16px_48px_rgba(0,0,0,0.6)] group cursor-pointer my-3 transition-transform duration-300"
+        >
+          {/* Background Artwork with Gradient Overlay */}
+          <img
+            src={featuredTrack.thumbnail || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=1200&q=80'}
+            alt={featuredTrack.title}
+            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-60"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#07090e] via-[#07090e]/60 to-transparent" />
+          <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+
+          {/* Top Badge */}
+          <div className="absolute top-3.5 left-3.5 sm:top-4 sm:left-4 z-10 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white text-[10px] font-black uppercase tracking-wider shadow">
+            <Sparkles className="w-3 h-3 text-[#1ed760]" />
+            <span>Featured Release</span>
+          </div>
+
+          {/* Bottom Info & Play Button */}
+          <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6 flex items-end justify-between gap-4 z-10">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-lg sm:text-2xl font-black text-white truncate drop-shadow-md tracking-tight group-hover:text-[#1ed760] transition-colors">
+                {featuredTrack.title}
+              </h3>
+              <p className="text-xs sm:text-sm text-zinc-300 font-semibold truncate mt-0.5 drop-shadow">
+                {featuredTrack.artist || 'Featured Artist'}
+              </p>
+            </div>
+
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (trending.length > 0) {
+                  playPlaylist(trending, 0);
+                }
+              }}
+              className="bg-white hover:bg-zinc-200 text-black font-extrabold text-xs sm:text-sm px-5 py-2.5 rounded-full flex items-center gap-2 shadow-xl active:scale-95 transition shrink-0 hover:scale-105"
+            >
+              <Play className="w-4 h-4 fill-current" />
+              <span>Play now</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Recommended Stations / Today's Biggest Hits (Horizontal Scrolling Carousel matching Screenshot) */}
       {(activeTab === 'all' || activeTab === 'songs') && trending.length > 0 && (
-        <section className="space-y-3.5 pt-2">
+        <section className="space-y-3 pt-1">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <h2 className="text-xl md:text-2xl font-black text-white hover:underline cursor-pointer tracking-tight">
-                Today's Biggest Hits
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-xl md:text-2xl font-black text-white tracking-tight">
+                Recommended Stations
               </h2>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-[#1ed760]/15 text-[#1ed760] border border-[#1ed760]/30 shadow-[0_0_12px_rgba(30,215,96,0.25)]">
                 Trending
@@ -240,21 +336,53 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
             <button
               onClick={() => playPlaylist(trending, 0)}
-              className="text-xs font-bold text-zinc-300 hover:text-white px-4 py-1.5 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 backdrop-blur-xl shadow-sm transition"
+              className="text-xs font-bold text-zinc-300 hover:text-white px-3.5 py-1.5 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 backdrop-blur-xl shadow-sm transition active:scale-95"
             >
               Play all
             </button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-4">
-            {trending.slice(0, 6).map(track => (
-              <TrackCard key={track.id} item={track} />
+          {/* Horizontal Scrolling Carousel with Snap & Smooth Scroll */}
+          <div className="flex gap-3 sm:gap-4 overflow-x-auto no-scrollbar scroll-smooth pb-2 pt-1 -mx-1 px-1">
+            {trending.map((track, idx) => (
+              <TrackCard
+                key={track.id}
+                item={track}
+                className="w-36 sm:w-44 shrink-0"
+                tracksContext={trending}
+                index={idx}
+              />
             ))}
           </div>
         </section>
       )}
 
-      {/* Section 2: Popular Tracks (Table View with rankings) */}
+      {/* 4. Popular Playlists & Mixes (Horizontal Scrolling Carousels) */}
+      {(activeTab === 'all' || activeTab === 'playlists') &&
+        shelves.map((shelf, sIdx) => (
+          <section key={sIdx} className="space-y-3 pt-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl md:text-2xl font-black text-white hover:underline cursor-pointer tracking-tight">
+                {shelf.title}
+              </h2>
+            </div>
+
+            <div className="flex gap-3 sm:gap-4 overflow-x-auto no-scrollbar scroll-smooth pb-2 pt-1 -mx-1 px-1">
+              {shelf.items.map((item, idx) => (
+                <TrackCard
+                  key={item.id}
+                  item={item}
+                  className="w-36 sm:w-44 shrink-0"
+                  onSelectPlaylist={onSelectPlaylist}
+                  tracksContext={shelf.items as any}
+                  index={idx}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
+
+      {/* 5. Popular Tracks (Ranked by plays Table List) */}
       {(activeTab === 'all' || activeTab === 'songs') && trending.length > 0 && (
         <section className="space-y-3.5 pt-3">
           <div className="flex items-center justify-between">
@@ -264,7 +392,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
           </div>
           <div className="bg-white/[0.03] backdrop-blur-2xl rounded-3xl p-2.5 sm:p-3.5 border border-white/[0.1] shadow-[0_12px_32px_rgba(0,0,0,0.4)]">
-            {trending.slice(0, 8).map((track, idx) => (
+            {trending.slice(0, 10).map((track, idx) => (
               <TrackRow
                 key={track.id}
                 track={track}
@@ -277,29 +405,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         </section>
       )}
 
-      {/* Section 3: Popular Playlists & Mixes (Playlists / All) */}
-      {(activeTab === 'all' || activeTab === 'playlists') &&
-        shelves.map((shelf, sIdx) => (
-          <section key={sIdx} className="space-y-3 pt-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl md:text-2xl font-black text-white hover:underline cursor-pointer tracking-tight">
-                {shelf.title}
-              </h2>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
-              {shelf.items.map(item => (
-                <TrackCard
-                  key={item.id}
-                  item={item}
-                  onSelectPlaylist={onSelectPlaylist}
-                />
-              ))}
-            </div>
-          </section>
-        ))}
-
-      {/* Section 4: Pre-save upcoming releases (Moved to Bottom) */}
+      {/* 6. Pre-save Upcoming Releases (Moved to Bottom as Requested) */}
       {(activeTab === 'all' || activeTab === 'songs') && (
         <section className="space-y-3 pt-4">
           <div className="flex items-center justify-between">
@@ -317,9 +423,15 @@ export const HomePage: React.FC<HomePageProps> = ({
             </button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
-            {upcomingReleases.map(track => (
-              <TrackCard key={track.id} item={track} />
+          <div className="flex gap-3 sm:gap-4 overflow-x-auto no-scrollbar scroll-smooth pb-2 pt-1 -mx-1 px-1">
+            {upcomingReleases.map((track, idx) => (
+              <TrackCard
+                key={track.id}
+                item={track}
+                className="w-36 sm:w-44 shrink-0"
+                tracksContext={upcomingReleases}
+                index={idx}
+              />
             ))}
           </div>
         </section>
