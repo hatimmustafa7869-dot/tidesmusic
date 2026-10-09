@@ -44,8 +44,8 @@ export const NowPlayingSidebar: React.FC<NowPlayingSidebarProps> = ({
 
   if (!currentTrack) {
     return (
-      <aside className="hidden xl:flex flex-col w-80 h-full bg-[#121212] rounded-lg p-4 select-none shrink-0 border border-white/5">
-        <div className="flex items-center justify-between pb-3 border-b border-white/10">
+      <aside className="hidden xl:flex flex-col w-80 h-full bg-[#0c0c0e]/60 backdrop-blur-2xl rounded-2xl p-4 select-none shrink-0 border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+        <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
           <span className="text-sm font-bold text-white">Now Playing</span>
           <button
             onClick={onClose}
@@ -67,9 +67,9 @@ export const NowPlayingSidebar: React.FC<NowPlayingSidebarProps> = ({
   const nextTrack = queue[queueIndex + 1];
 
   return (
-    <aside className="hidden lg:flex flex-col w-72 xl:w-80 h-full bg-[#121212] rounded-lg select-none shrink-0 overflow-hidden border border-white/5 shadow-2xl animate-fade-in">
+    <aside className="hidden lg:flex flex-col w-72 xl:w-80 h-full bg-[#0c0c0e]/60 backdrop-blur-2xl rounded-2xl select-none shrink-0 overflow-hidden border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.4)] animate-fade-in">
       {/* Top Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08]">
         <span className="text-sm font-bold text-white truncate max-w-[190px]">
           {isFav ? 'Liked Songs' : currentTrack.artist || 'Now Playing'}
         </span>
@@ -119,10 +119,10 @@ export const NowPlayingSidebar: React.FC<NowPlayingSidebarProps> = ({
           </button>
         </div>
 
-        {/* Lyrics Preview Maroon Card (Spotify Desktop Exact Match) */}
+        {/* Lyrics Preview Glass Card */}
         <div
           onClick={onOpenLyricsModal}
-          className="bg-[#480909] hover:bg-[#560b0b] rounded-xl p-4 transition-all duration-200 cursor-pointer border border-white/5 space-y-2 group shadow-lg"
+          className="bg-white/[0.04] hover:bg-white/[0.08] backdrop-blur-xl rounded-2xl p-4 transition-all duration-300 cursor-pointer border border-white/[0.08] hover:border-white/[0.14] space-y-2 group shadow-lg"
         >
           <div className="flex items-center justify-between">
             <span className="text-sm font-bold text-white">Lyrics preview</span>
@@ -143,11 +143,11 @@ export const NowPlayingSidebar: React.FC<NowPlayingSidebarProps> = ({
           </div>
         </div>
 
-        {/* Next in Queue Preview Card */}
+        {/* Next in Queue Preview Glass Card */}
         {nextTrack && (
-          <div className="bg-[#181818] hover:bg-[#202020] rounded-xl p-3 border border-white/5 transition">
+          <div className="bg-white/[0.03] hover:bg-white/[0.06] backdrop-blur-md rounded-2xl p-3 border border-white/[0.06] transition-all">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Next in queue</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Next in queue</span>
             </div>
             <div
               onClick={() => playTrack(nextTrack)}
@@ -156,7 +156,7 @@ export const NowPlayingSidebar: React.FC<NowPlayingSidebarProps> = ({
               <img
                 src={nextTrack.thumbnail}
                 alt={nextTrack.title}
-                className="w-10 h-10 rounded object-cover shrink-0 shadow"
+                className="w-10 h-10 rounded-xl object-cover shrink-0 shadow"
               />
               <div className="flex-1 min-w-0">
                 <span className="text-xs font-bold text-white truncate block group-hover:text-[#1ed760] transition">

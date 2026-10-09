@@ -86,10 +86,10 @@ export const Player: React.FC<PlayerProps> = ({
   const volumePercent = isMuted ? 0 : volume * 100;
 
   return (
-    <div className="relative z-40 bg-[#000000] border-t border-[#282828] select-none text-white shrink-0">
+    <div className="relative z-40 bg-[#070709]/85 backdrop-blur-2xl border-t border-white/[0.08] select-none text-white shrink-0 shadow-[0_-8px_32px_rgba(0,0,0,0.6)]">
       {/* Top Edge Progress Bar for Mobile */}
       <div
-        className="md:hidden absolute top-0 left-0 right-0 h-[2.5px] bg-zinc-800 cursor-pointer"
+        className="md:hidden absolute top-0 left-0 right-0 h-[2.5px] bg-white/[0.08] cursor-pointer"
         onClick={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();
           const clickX = e.clientX - rect.left;
@@ -107,7 +107,7 @@ export const Player: React.FC<PlayerProps> = ({
       {isJamActive && (
         <div
           onClick={() => setIsJamModalOpen(true)}
-          className="absolute -top-7 left-1/2 transform -translate-x-1/2 px-3 py-0.5 rounded-t-lg bg-black/90 border border-b-0 border-[#1ed760]/40 text-white text-[11px] font-bold flex items-center gap-2 shadow-lg backdrop-blur-md cursor-pointer hover:bg-zinc-900 transition"
+          className="absolute -top-7 left-1/2 transform -translate-x-1/2 px-3 py-0.5 rounded-t-xl bg-[#0c0c0e]/90 border border-b-0 border-[#1ed760]/40 text-white text-[11px] font-bold flex items-center gap-2 shadow-lg backdrop-blur-xl cursor-pointer hover:bg-zinc-900 transition"
         >
           <span className="w-1.5 h-1.5 rounded-full bg-[#1ed760] animate-ping" />
           <span className="text-[#1ed760] font-black">Jam:</span>

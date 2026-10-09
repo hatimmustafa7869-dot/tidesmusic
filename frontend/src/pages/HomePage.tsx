@@ -138,42 +138,42 @@ export const HomePage: React.FC<HomePageProps> = ({
   ];
 
   return (
-    <div className="space-y-6 pb-24 animate-fade-in select-none">
+    <div className="space-y-7 pb-24 animate-fade-in select-none">
       {/* Category Pills Bar: All, Songs, Playlists */}
-      <div className="flex items-center gap-2 pt-1 pb-1 border-b border-white/5">
+      <div className="flex items-center gap-2 pt-1 pb-2 border-b border-white/[0.06]">
         <button
           onClick={() => setActiveTab('all')}
-          className={`px-4 py-1.5 rounded-full text-xs font-bold transition ${
+          className={`px-4 py-1.5 rounded-full text-xs font-bold transition duration-200 ${
             activeTab === 'all'
-              ? 'bg-white text-black shadow'
-              : 'bg-[#242424] hover:bg-[#2a2a2a] text-white'
+              ? 'bg-white text-black shadow-md font-extrabold scale-105'
+              : 'bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/[0.06] backdrop-blur-md'
           }`}
         >
           All
         </button>
         <button
           onClick={() => setActiveTab('songs')}
-          className={`px-4 py-1.5 rounded-full text-xs font-bold transition ${
+          className={`px-4 py-1.5 rounded-full text-xs font-bold transition duration-200 ${
             activeTab === 'songs'
-              ? 'bg-white text-black shadow'
-              : 'bg-[#242424] hover:bg-[#2a2a2a] text-white'
+              ? 'bg-white text-black shadow-md font-extrabold scale-105'
+              : 'bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/[0.06] backdrop-blur-md'
           }`}
         >
           Songs
         </button>
         <button
           onClick={() => setActiveTab('playlists')}
-          className={`px-4 py-1.5 rounded-full text-xs font-bold transition ${
+          className={`px-4 py-1.5 rounded-full text-xs font-bold transition duration-200 ${
             activeTab === 'playlists'
-              ? 'bg-white text-black shadow'
-              : 'bg-[#242424] hover:bg-[#2a2a2a] text-white'
+              ? 'bg-white text-black shadow-md font-extrabold scale-105'
+              : 'bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/[0.06] backdrop-blur-md'
           }`}
         >
           Playlists
         </button>
       </div>
 
-      {/* Quick Access 6-Grid (Always visible or in All/Songs) */}
+      {/* Quick Access 6-Grid (Always visible in All or Songs) */}
       {(activeTab === 'all' || activeTab === 'songs') && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
           {quickCards.map(item => {
@@ -182,7 +182,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               <div
                 key={item.id}
                 onClick={item.onClick}
-                className="group flex items-center bg-[#242424]/70 hover:bg-[#303030] rounded-md overflow-hidden cursor-pointer transition duration-200 select-none pr-3 shadow-sm hover:shadow-md"
+                className="group flex items-center bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] hover:border-white/[0.14] rounded-xl overflow-hidden cursor-pointer transition-all duration-300 select-none pr-3 shadow-sm hover:shadow-lg backdrop-blur-md hover:-translate-y-0.5"
               >
                 {item.isLiked ? (
                   <div className="w-14 h-14 bg-gradient-to-br from-[#450af5] via-[#8e2de2] to-[#ff416c] flex items-center justify-center shrink-0 shadow">
@@ -220,40 +220,64 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       )}
 
-      {/* Section 1: Pre-save upcoming releases (Songs / All) */}
-      {(activeTab === 'all' || activeTab === 'songs') && (
-        <section className="space-y-3 pt-3">
+      {/* Section 1: Today's Biggest Hits (Prominently at the Top) */}
+      {(activeTab === 'all' || activeTab === 'songs') && trending.length > 0 && (
+        <section className="space-y-3 pt-2">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl md:text-2xl font-black text-white hover:underline cursor-pointer tracking-tight">
-              Pre-save upcoming releases
-            </h2>
+            <div>
+              <h2 className="text-xl md:text-2xl font-black text-white hover:underline cursor-pointer tracking-tight">
+                Today's Biggest Hits
+              </h2>
+              <p className="text-xs text-zinc-400 mt-0.5">Top trending songs on charts worldwide</p>
+            </div>
             <button
-              onClick={() => playPlaylist(upcomingReleases, 0)}
-              className="text-xs font-bold text-zinc-400 hover:text-white hover:underline"
+              onClick={() => playPlaylist(trending, 0)}
+              className="text-xs font-bold text-zinc-400 hover:text-white hover:underline px-3 py-1 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition"
             >
               Play all
             </button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {upcomingReleases.map(track => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+            {trending.slice(0, 6).map(track => (
               <TrackCard key={track.id} item={track} />
             ))}
           </div>
         </section>
       )}
 
-      {/* Section 2: Popular Playlists & Mixes (Playlists / All) */}
+      {/* Section 2: Popular Tracks (Table View with rankings) */}
+      {(activeTab === 'all' || activeTab === 'songs') && trending.length > 0 && (
+        <section className="space-y-3 pt-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-black text-white tracking-tight">Popular Tracks</h2>
+            <span className="text-xs text-zinc-500 font-semibold">Ranked by plays</span>
+          </div>
+          <div className="bg-white/[0.02] backdrop-blur-md rounded-2xl p-2 sm:p-2.5 border border-white/[0.06] shadow-sm">
+            {trending.slice(0, 8).map((track, idx) => (
+              <TrackRow
+                key={track.id}
+                track={track}
+                index={idx}
+                tracksContext={trending}
+                onAddToPlaylist={onOpenAddToPlaylist}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Section 3: Popular Playlists & Mixes (Playlists / All) */}
       {(activeTab === 'all' || activeTab === 'playlists') &&
         shelves.map((shelf, sIdx) => (
-          <section key={sIdx} className="space-y-3 pt-2">
+          <section key={sIdx} className="space-y-3 pt-3">
             <div className="flex items-center justify-between">
               <h2 className="text-xl md:text-2xl font-black text-white hover:underline cursor-pointer tracking-tight">
                 {shelf.title}
               </h2>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
               {shelf.items.map(item => (
                 <TrackCard
                   key={item.id}
@@ -265,45 +289,27 @@ export const HomePage: React.FC<HomePageProps> = ({
           </section>
         ))}
 
-      {/* Section 3: Today's Biggest Hits (Songs / All) */}
-      {(activeTab === 'all' || activeTab === 'songs') && trending.length > 0 && (
-        <section className="space-y-3 pt-2">
+      {/* Section 4: Pre-save upcoming releases (Moved to Bottom) */}
+      {(activeTab === 'all' || activeTab === 'songs') && (
+        <section className="space-y-3 pt-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl md:text-2xl font-black text-white hover:underline cursor-pointer tracking-tight">
-                Today's Biggest Hits
+                Pre-save upcoming releases
               </h2>
-              <p className="text-xs text-zinc-400 mt-0.5">Top trending songs on charts</p>
+              <p className="text-xs text-zinc-400 mt-0.5">Anticipated tracks & premiering singles</p>
             </div>
             <button
-              onClick={() => playPlaylist(trending, 0)}
-              className="text-xs font-bold text-zinc-400 hover:text-white hover:underline"
+              onClick={() => playPlaylist(upcomingReleases, 0)}
+              className="text-xs font-bold text-zinc-400 hover:text-white hover:underline px-3 py-1 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition"
             >
               Play all
             </button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {trending.slice(0, 6).map(track => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+            {upcomingReleases.map(track => (
               <TrackCard key={track.id} item={track} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Section 4: Popular Tracks Table View (Songs / All) */}
-      {(activeTab === 'all' || activeTab === 'songs') && trending.length > 0 && (
-        <section className="space-y-3 pt-4">
-          <h2 className="text-xl font-black text-white tracking-tight">Popular Tracks</h2>
-          <div className="bg-[#181818]/60 rounded-xl p-2 border border-white/5">
-            {trending.slice(0, 8).map((track, idx) => (
-              <TrackRow
-                key={track.id}
-                track={track}
-                index={idx}
-                tracksContext={trending}
-                onAddToPlaylist={onOpenAddToPlaylist}
-              />
             ))}
           </div>
         </section>

@@ -151,7 +151,12 @@ export const MainApp: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-black text-white font-sans">
+    <div className="relative flex flex-col h-screen w-screen overflow-hidden bg-[#070709] text-white font-sans selection:bg-[#1ed760]/30 selection:text-white">
+      {/* Ambient Lighting Orbs for Authentic Glassmorphism Refraction */}
+      <div className="pointer-events-none fixed -top-32 -left-32 w-[450px] h-[450px] bg-indigo-600/[0.08] rounded-full blur-[140px] z-0" />
+      <div className="pointer-events-none fixed -bottom-32 -right-32 w-[450px] h-[450px] bg-emerald-500/[0.07] rounded-full blur-[140px] z-0" />
+      <div className="pointer-events-none fixed top-1/3 right-1/4 w-[380px] h-[380px] bg-cyan-500/[0.04] rounded-full blur-[160px] z-0" />
+
       {/* 1. Spotify Global Desktop Top Bar */}
       <Navbar
         onSearch={handleSearch}
@@ -169,7 +174,7 @@ export const MainApp: React.FC = () => {
       />
 
       {/* 2. Main 3-Pane Desktop Layout: Left Sidebar + Center Content + Right Now Playing Sidebar */}
-      <div className="flex-1 flex overflow-hidden p-1 sm:px-2 sm:pb-2 gap-2 min-h-0">
+      <div className="relative z-10 flex-1 flex overflow-hidden p-1 sm:px-2.5 sm:pb-2.5 gap-2.5 min-h-0">
         {/* Left: Your Library Sidebar */}
         <Sidebar
           currentView={currentView}
@@ -182,8 +187,8 @@ export const MainApp: React.FC = () => {
           onCloseMobile={() => setIsMobileSidebarOpen(false)}
         />
 
-        {/* Center: Main Content Panel (Rounded container bg-[#121212]) */}
-        <div className="flex-1 flex flex-col h-full min-w-0 bg-[#121212] rounded-lg overflow-hidden relative border border-white/5 shadow-inner">
+        {/* Center: Main Content Panel (Frosted glass container) */}
+        <div className="flex-1 flex flex-col h-full min-w-0 bg-[#0c0c0e]/55 backdrop-blur-2xl rounded-2xl overflow-hidden relative border border-white/[0.07] shadow-[0_8px_32px_rgba(0,0,0,0.35)]">
           <main className="flex-1 overflow-y-auto px-3 sm:px-4 md:px-7 py-3 sm:py-4">
             {currentView === 'home' && (
               <HomePage

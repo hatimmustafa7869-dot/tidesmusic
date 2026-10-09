@@ -18,6 +18,8 @@ electron/node_modules/
 *.sqlite3
 soundflow.db
 backend/data/*.db
+tides_data*.json
+tides_data*.tmp
 
 # Logs & Temporary files
 *.log

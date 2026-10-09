@@ -59,11 +59,17 @@ export const api = {
     return data.playlists || [];
   },
 
-  async createUserPlaylist(title: string, description: string = '', thumbnail: string = '', id?: string): Promise<Playlist> {
+  async createUserPlaylist(
+    title: string,
+    description: string = '',
+    thumbnail: string = '',
+    id?: string,
+    tracks?: Track[]
+  ): Promise<Playlist> {
     const res = await fetch(`${API_BASE}/user/playlists`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ title, description, thumbnail, id })
+      body: JSON.stringify({ title, description, thumbnail, id, tracks })
     });
     if (!res.ok) throw new Error('Failed to create playlist');
     const data = await res.json();
@@ -93,11 +99,33 @@ export const api = {
     });
   },
 
+  async addBatchTracksToPlaylist(playlistId: string, tracks: Track[]): Promise<void> {
+    await fetch(`${API_BASE}/user/playlists/${encodeURIComponent(playlistId)}/batch-tracks`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ tracks })
+    });
+  },
+
   async removeTrackFromPlaylist(playlistId: string, trackId: string): Promise<void> {
     await fetch(`${API_BASE}/user/playlists/${encodeURIComponent(playlistId)}/tracks/${encodeURIComponent(trackId)}`, {
       method: 'DELETE',
       headers: getAuthHeaders()
     });
+  },
+
+  async syncFullLibrary(
+    localPlaylists: Playlist[],
+    localFavorites: Track[],
+    localHistory: Track[]
+  ): Promise<{ playlists: Playlist[]; favorites: Track[]; history: Track[] }> {
+    const res = await fetch(`${API_BASE}/user/sync`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ localPlaylists, localFavorites, localHistory })
+    });
+    if (!res.ok) throw new Error('Failed to sync library');
+    return res.json();
   },
 
   // User Cloud Favorites API

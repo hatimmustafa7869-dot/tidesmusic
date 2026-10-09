@@ -32,9 +32,15 @@ const STORAGE_KEY_HISTORY = 'soundflow_history_v1';
 export const LibraryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isAuthenticated } = useAuth();
 
+  const getStorageKey = (type: 'playlists' | 'favorites' | 'history') => {
+    const scope = user?.id ? `user_${user.id}` : 'guest';
+    return `soundflow_${type}_${scope}`;
+  };
+
   const [playlists, setPlaylists] = useState<Playlist[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY_PLAYLISTS);
+      const key = user?.id ? `soundflow_playlists_user_${user.id}` : 'soundflow_playlists_guest';
+      const saved = localStorage.getItem(key) || localStorage.getItem(STORAGE_KEY_PLAYLISTS);
       if (saved) return JSON.parse(saved);
     } catch (e) {
       console.error(e);
@@ -44,7 +50,8 @@ export const LibraryProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const [favorites, setFavorites] = useState<Track[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY_FAVORITES);
+      const key = user?.id ? `soundflow_favorites_user_${user.id}` : 'soundflow_favorites_guest';
+      const saved = localStorage.getItem(key) || localStorage.getItem(STORAGE_KEY_FAVORITES);
       if (saved) return JSON.parse(saved);
     } catch (e) {
       console.error(e);
@@ -54,7 +61,8 @@ export const LibraryProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const [history, setHistory] = useState<Track[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY_HISTORY);
+      const key = user?.id ? `soundflow_history_user_${user.id}` : 'soundflow_history_guest';
+      const saved = localStorage.getItem(key) || localStorage.getItem(STORAGE_KEY_HISTORY);
       if (saved) return JSON.parse(saved);
     } catch (e) {
       console.error(e);
@@ -69,15 +77,26 @@ export const LibraryProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!isAuthenticated) return;
     setIsLoadingLibrary(true);
     try {
-      const [cloudPlaylists, cloudFavs, cloudHistory] = await Promise.all([
-        api.getUserPlaylists(),
-        api.getUserFavorites(),
-        api.getUserHistory()
-      ]);
+      // Merge any local guest playlists or favorites into cloud account
+      const syncRes = await api.syncFullLibrary(playlists, favorites, history).catch(err => {
+        console.warn('Sync full library fallback to separate gets:', err);
+        return null;
+      });
 
-      setPlaylists(cloudPlaylists);
-      setFavorites(cloudFavs);
-      setHistory(cloudHistory);
+      if (syncRes) {
+        setPlaylists(syncRes.playlists || []);
+        setFavorites(syncRes.favorites || []);
+        setHistory(syncRes.history || []);
+      } else {
+        const [cloudPlaylists, cloudFavs, cloudHistory] = await Promise.all([
+          api.getUserPlaylists(),
+          api.getUserFavorites(),
+          api.getUserHistory()
+        ]);
+        setPlaylists(cloudPlaylists);
+        setFavorites(cloudFavs);
+        setHistory(cloudHistory);
+      }
     } catch (err) {
       console.error('Failed to sync library from cloud:', err);
     } finally {
@@ -88,21 +107,34 @@ export const LibraryProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => {
     if (isAuthenticated) {
       syncWithCloud();
+    } else {
+      // Switched to guest mode: load guest local state
+      try {
+        const savedPl = localStorage.getItem('soundflow_playlists_guest');
+        setPlaylists(savedPl ? JSON.parse(savedPl) : []);
+        const savedFav = localStorage.getItem('soundflow_favorites_guest');
+        setFavorites(savedFav ? JSON.parse(savedFav) : []);
+        const savedHist = localStorage.getItem('soundflow_history_guest');
+        setHistory(savedHist ? JSON.parse(savedHist) : []);
+      } catch {}
     }
   }, [isAuthenticated, user?.id]);
 
   // Persist locally for instant loading on page refresh and offline usage
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_PLAYLISTS, JSON.stringify(playlists));
-  }, [playlists]);
+    const key = getStorageKey('playlists');
+    localStorage.setItem(key, JSON.stringify(playlists));
+  }, [playlists, user?.id]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_FAVORITES, JSON.stringify(favorites));
-  }, [favorites]);
+    const key = getStorageKey('favorites');
+    localStorage.setItem(key, JSON.stringify(favorites));
+  }, [favorites, user?.id]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(history));
-  }, [history]);
+    const key = getStorageKey('history');
+    localStorage.setItem(key, JSON.stringify(history));
+  }, [history, user?.id]);
 
   const createPlaylist = async (title: string, description: string = ''): Promise<Playlist> => {
     if (isAuthenticated) {
@@ -187,11 +219,7 @@ export const LibraryProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const addTracksToPlaylist = async (playlistId: string, newTracks: Track[]) => {
     if (isAuthenticated) {
       try {
-        const chunkSize = 5;
-        for (let i = 0; i < newTracks.length; i += chunkSize) {
-          const chunk = newTracks.slice(i, i + chunkSize);
-          await Promise.all(chunk.map(t => api.addTrackToPlaylist(playlistId, t).catch(console.error)));
-        }
+        await api.addBatchTracksToPlaylist(playlistId, newTracks);
       } catch (err) {
         console.error(err);
       }
@@ -236,14 +264,10 @@ export const LibraryProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const pl = await api.createUserPlaylist(
         playlistInfo.title || 'Saved Playlist',
         playlistInfo.description || '',
-        playlistInfo.thumbnail || (tracks[0] ? tracks[0].thumbnail : '')
+        playlistInfo.thumbnail || (tracks[0] ? tracks[0].thumbnail : ''),
+        undefined,
+        tracks
       );
-      // Add all tracks in parallel chunks of 5
-      const chunkSize = 5;
-      for (let i = 0; i < tracks.length; i += chunkSize) {
-        const chunk = tracks.slice(i, i + chunkSize);
-        await Promise.all(chunk.map(t => api.addTrackToPlaylist(pl.id, t).catch(console.error)));
-      }
       pl.tracks = tracks;
       pl.itemCount = tracks.length;
       setPlaylists(prev => [pl, ...prev.filter(p => p.id !== pl.id)]);

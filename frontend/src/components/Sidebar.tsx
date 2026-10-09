@@ -87,13 +87,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const showPlaylists = activeFilter === 'all' || activeFilter === 'playlists';
 
   const sidebarContent = (
-    <div className="flex flex-col h-full bg-[#121212] rounded-lg select-none text-[#b3b3b3] p-3 overflow-hidden border border-white/5">
+    <div className="flex flex-col h-full bg-[#0c0c0e]/60 backdrop-blur-2xl rounded-2xl select-none text-zinc-400 p-3 overflow-hidden border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
       {/* Mobile Top Navigation Links */}
-      <div className="md:hidden flex flex-col gap-1 pb-3 mb-2 border-b border-white/5">
+      <div className="md:hidden flex flex-col gap-1 pb-3 mb-2 border-b border-white/[0.08]">
         <button
           onClick={() => handleNav('home')}
-          className={`flex items-center gap-3 px-3 py-2 rounded-lg font-bold text-sm transition ${
-            currentView === 'home' ? 'bg-[#282828] text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'
+          className={`flex items-center gap-3 px-3 py-2 rounded-xl font-bold text-sm transition ${
+            currentView === 'home' ? 'bg-white/[0.1] text-white shadow-sm' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
           }`}
         >
           <Home className="w-5 h-5 text-[#1ed760]" />
@@ -101,8 +101,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </button>
         <button
           onClick={() => handleNav('search')}
-          className={`flex items-center gap-3 px-3 py-2 rounded-lg font-bold text-sm transition ${
-            currentView === 'search' ? 'bg-[#282828] text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'
+          className={`flex items-center gap-3 px-3 py-2 rounded-xl font-bold text-sm transition ${
+            currentView === 'search' ? 'bg-white/[0.1] text-white shadow-sm' : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
           }`}
         >
           <Search className="w-5 h-5 text-[#1ed760]" />
@@ -113,7 +113,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             setIsJamModalOpen(true);
             if (onCloseMobile) onCloseMobile();
           }}
-          className="flex items-center justify-between px-3 py-2 rounded-lg font-bold text-sm text-zinc-300 hover:text-white hover:bg-white/5 transition"
+          className="flex items-center justify-between px-3 py-2 rounded-xl font-bold text-sm text-zinc-300 hover:text-white hover:bg-white/[0.04] transition"
         >
           <div className="flex items-center gap-3">
             <Radio className="w-5 h-5 text-[#1ed760]" />
@@ -133,9 +133,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="flex items-center justify-between px-2 py-1 mb-2">
         <button
           onClick={() => handleNav('favorites')}
-          className="flex items-center gap-2.5 text-base font-bold text-[#b3b3b3] hover:text-white transition group"
+          className="flex items-center gap-2.5 text-base font-bold text-zinc-300 hover:text-white transition group"
         >
-          <Library className="w-6 h-6 text-zinc-400 group-hover:text-white transition" />
+          <Library className="w-5 h-5 text-zinc-400 group-hover:text-[#1ed760] transition" />
           <span className="text-sm font-extrabold tracking-tight text-zinc-200 group-hover:text-white">Your Library</span>
         </button>
 
@@ -143,14 +143,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={onOpenImportPlaylist}
             title="Import Playlist"
-            className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/10 rounded-full transition"
+            className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/[0.08] rounded-full transition"
           >
             <Download className="w-4 h-4" />
           </button>
           <button
             onClick={onOpenCreatePlaylist}
             title="Create Playlist"
-            className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/10 rounded-full transition"
+            className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/[0.08] rounded-full transition"
           >
             <Plus className="w-5 h-5" />
           </button>
@@ -158,7 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               onClick={onCloseMobile}
               title="Close Menu"
-              className="md:hidden p-1.5 text-zinc-400 hover:text-white hover:bg-white/10 rounded-full transition ml-1"
+              className="md:hidden p-1.5 text-zinc-400 hover:text-white hover:bg-white/[0.08] rounded-full transition ml-1"
             >
               <X className="w-5 h-5" />
             </button>
@@ -171,7 +171,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button
           onClick={() => setActiveFilter('all')}
           className={`px-3 py-1 rounded-full text-xs font-bold transition shrink-0 ${
-            activeFilter === 'all' ? 'bg-[#2a2a2a] text-white' : 'bg-[#1a1a1a] text-zinc-400 hover:text-white'
+            activeFilter === 'all'
+              ? 'bg-white text-black font-extrabold shadow-sm'
+              : 'bg-white/[0.04] text-zinc-400 hover:text-white border border-white/[0.06] backdrop-blur-md'
           }`}
         >
           All
@@ -179,7 +181,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button
           onClick={() => setActiveFilter('playlists')}
           className={`px-3 py-1 rounded-full text-xs font-bold transition shrink-0 ${
-            activeFilter === 'playlists' ? 'bg-[#2a2a2a] text-white' : 'bg-[#1a1a1a] text-zinc-400 hover:text-white'
+            activeFilter === 'playlists'
+              ? 'bg-white text-black font-extrabold shadow-sm'
+              : 'bg-white/[0.04] text-zinc-400 hover:text-white border border-white/[0.06] backdrop-blur-md'
           }`}
         >
           Playlists
@@ -187,7 +191,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button
           onClick={() => setActiveFilter('liked')}
           className={`px-3 py-1 rounded-full text-xs font-bold transition shrink-0 ${
-            activeFilter === 'liked' ? 'bg-[#2a2a2a] text-white' : 'bg-[#1a1a1a] text-zinc-400 hover:text-white'
+            activeFilter === 'liked'
+              ? 'bg-white text-black font-extrabold shadow-sm'
+              : 'bg-white/[0.04] text-zinc-400 hover:text-white border border-white/[0.06] backdrop-blur-md'
           }`}
         >
           Liked Songs

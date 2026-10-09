@@ -64,13 +64,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   const initialLetter = user?.username ? user.username.charAt(0).toUpperCase() : 'T';
 
   return (
-    <header className="h-14 px-2 sm:px-4 flex items-center justify-between gap-2 sm:gap-4 select-none shrink-0 bg-black text-white">
+    <header className="h-14 px-2 sm:px-4 flex items-center justify-between gap-2 sm:gap-4 select-none shrink-0 bg-[#09090b]/75 backdrop-blur-2xl border-b border-white/[0.08] text-white z-30 shadow-sm">
       {/* Left: Mobile Library Menu & Brand Logo & Navigation History Arrows */}
       <div className="flex items-center gap-1 sm:gap-2.5 shrink-0">
         {/* Mobile Library Menu Toggle */}
         <button
           onClick={onOpenMobileMenu}
-          className="md:hidden p-1.5 text-zinc-300 hover:text-white rounded-lg hover:bg-white/10 active:scale-95 transition"
+          className="md:hidden p-1.5 text-zinc-300 hover:text-white rounded-xl hover:bg-white/[0.08] active:scale-95 transition"
           title="Open Library Menu"
         >
           <img src="/logo.png" alt="Tides" className="w-7 h-7 rounded-lg object-cover shadow" />
@@ -85,7 +85,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <img
             src="/logo.png"
             alt="Tides Music"
-            className="w-8 h-8 rounded-lg object-cover shadow-lg group-hover:scale-105 transition duration-200 border border-white/10"
+            className="w-8 h-8 rounded-xl object-cover shadow-lg group-hover:scale-105 transition duration-200 border border-white/10"
           />
           <span className="hidden xl:inline text-base font-black tracking-tight text-white group-hover:text-[#1ed760] transition">
             TIDES
@@ -97,9 +97,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={onGoBack}
             disabled={!canGoBack}
-            className={`w-8 h-8 rounded-full bg-[#121212] flex items-center justify-center transition ${
+            className={`w-8 h-8 rounded-full bg-white/[0.04] border border-white/[0.06] backdrop-blur-md flex items-center justify-center transition ${
               canGoBack
-                ? 'text-zinc-200 hover:text-white hover:bg-[#282828] cursor-pointer'
+                ? 'text-zinc-200 hover:text-white hover:bg-white/[0.09] hover:border-white/[0.14] cursor-pointer'
                 : 'text-zinc-600 opacity-40 cursor-not-allowed'
             }`}
             title="Go back"
@@ -109,9 +109,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={onGoForward}
             disabled={!canGoForward}
-            className={`w-8 h-8 rounded-full bg-[#121212] flex items-center justify-center transition ${
+            className={`w-8 h-8 rounded-full bg-white/[0.04] border border-white/[0.06] backdrop-blur-md flex items-center justify-center transition ${
               canGoForward
-                ? 'text-zinc-200 hover:text-white hover:bg-[#282828] cursor-pointer'
+                ? 'text-zinc-200 hover:text-white hover:bg-white/[0.09] hover:border-white/[0.14] cursor-pointer'
                 : 'text-zinc-600 opacity-40 cursor-not-allowed'
             }`}
             title="Go forward"
@@ -126,18 +126,18 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Desktop Round Home Button (Hidden on mobile to provide maximum space for search) */}
         <button
           onClick={onNavigateHome}
-          className="hidden md:flex w-12 h-12 rounded-full bg-[#1f1f1f] hover:bg-[#282828] hover:scale-105 active:scale-95 text-white items-center justify-center transition shadow shrink-0"
+          className="hidden md:flex w-10 h-10 rounded-full bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] hover:border-white/[0.16] backdrop-blur-md hover:scale-105 active:scale-95 text-white items-center justify-center transition shadow-sm shrink-0"
           title="Home"
         >
-          <Home className="w-5 h-5 fill-current" />
+          <Home className="w-4 h-4 fill-current" />
         </button>
 
         {/* Spacious Responsive Search Bar */}
         <form
           onSubmit={handleSubmit}
-          className="relative flex-1 min-w-0 flex items-center bg-[#1f1f1f] hover:bg-[#282828] focus-within:bg-[#242424] focus-within:border-white/30 border border-transparent rounded-full px-3 sm:px-3.5 py-1.5 sm:py-2.5 transition duration-200"
+          className="relative flex-1 min-w-0 flex items-center bg-white/[0.05] hover:bg-white/[0.08] focus-within:bg-white/[0.1] border border-white/[0.08] focus-within:border-white/[0.22] backdrop-blur-xl rounded-full px-3 sm:px-3.5 py-1.5 sm:py-2 transition duration-200 shadow-inner"
         >
-          <Search className="w-4 h-4 sm:w-5 sm:h-5 text-zinc-400 shrink-0 mr-2" />
+          <Search className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-zinc-400 shrink-0 mr-2" />
           <input
             type="text"
             value={query}
@@ -170,8 +170,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           title={isJamActive ? `In Jam (${participants.length} listeners)` : "Spotify Jam"}
           className={`flex items-center gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-full border text-xs font-bold transition hover:scale-105 active:scale-95 shadow-sm shrink-0 ${
             isJamActive
-              ? 'bg-[#1ed760] text-black border-[#1ed760] shadow-[0_0_12px_rgba(30,215,96,0.6)] animate-pulse'
-              : 'bg-[#1f1f1f] hover:bg-[#282828] border-white/10 text-zinc-300 hover:text-white'
+              ? 'bg-[#1ed760] text-black border-[#1ed760] shadow-[0_0_14px_rgba(30,215,96,0.6)] animate-pulse'
+              : 'bg-white/[0.05] hover:bg-white/[0.1] border-white/[0.08] text-zinc-300 hover:text-white backdrop-blur-md'
           }`}
         >
           <Radio className={`w-4 h-4 shrink-0 ${isJamActive ? 'text-black' : 'text-[#1ed760]'}`} />
@@ -192,7 +192,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <button
           onClick={onOpenImport}
           title="Import Playlist"
-          className="hidden md:flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#1f1f1f] hover:bg-[#282828] text-xs font-semibold text-zinc-300 hover:text-white transition"
+          className="hidden md:flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-xs font-semibold text-zinc-300 hover:text-white transition backdrop-blur-md"
         >
           <Download className="w-3.5 h-3.5 text-[#1ed760]" />
           <span>Import</span>
@@ -215,8 +215,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             {showProfileMenu && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
-                <div className="absolute right-0 top-full mt-2 w-52 bg-[#282828] rounded-lg shadow-2xl p-1.5 z-50 text-xs border border-zinc-700 animate-in fade-in zoom-in-95">
-                  <div className="px-3 py-2 text-zinc-400 border-b border-zinc-700/60 truncate">
+                <div className="absolute right-0 top-full mt-2 w-52 bg-[#0c0c0e]/95 backdrop-blur-2xl rounded-2xl shadow-2xl p-1.5 z-50 text-xs border border-white/[0.1] animate-in fade-in zoom-in-95">
+                  <div className="px-3 py-2 text-zinc-400 border-b border-white/[0.08] truncate">
                     Account: <strong className="text-white block truncate">{user?.username}</strong>
                   </div>
                   <button
@@ -224,7 +224,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       logout();
                       setShowProfileMenu(false);
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-red-400 hover:bg-[#3e3e3e] rounded text-left transition font-semibold mt-1"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-red-400 hover:bg-white/[0.08] rounded-xl text-left transition font-semibold mt-1"
                   >
                     <LogOut className="w-4 h-4" />
                     Log Out
@@ -237,7 +237,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               onClick={() => onOpenAuth('login')}
-              className="px-2.5 sm:px-4 py-1.5 rounded-full bg-white hover:bg-zinc-200 text-black font-extrabold text-xs tracking-wider transition hover:scale-105 shadow shrink-0"
+              className="px-2.5 sm:px-4 py-1.5 rounded-full bg-white hover:bg-zinc-200 text-black font-extrabold text-xs tracking-wider transition hover:scale-105 shadow-md shrink-0"
             >
               Log in
             </button>

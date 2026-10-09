@@ -43,18 +43,35 @@ function loadDb() {
   try {
     if (fs.existsSync(DB_FILE)) {
       const raw = fs.readFileSync(DB_FILE, 'utf8');
-      db = JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      db = {
+        users: Array.isArray(parsed.users) ? parsed.users : [],
+        playlists: Array.isArray(parsed.playlists) ? parsed.playlists : [],
+        favorites: (parsed.favorites && typeof parsed.favorites === 'object') ? parsed.favorites : {},
+        history: (parsed.history && typeof parsed.history === 'object') ? parsed.history : {}
+      };
+      console.log(`Database loaded successfully: ${db.users.length} users, ${db.playlists.length} playlists.`);
+    } else {
+      saveDb();
+      console.log('Database initialized with default structure at', DB_FILE);
     }
   } catch (err) {
-    console.error('Error loading db file:', err.message);
+    console.error('Error loading db file, initializing fresh:', err.message);
+    saveDb();
   }
 }
 
 function saveDb() {
   try {
-    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8');
+    const tmp = DB_FILE + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(db, null, 2), 'utf8');
+    fs.renameSync(tmp, DB_FILE);
   } catch (err) {
-    console.error('Error saving db file:', err.message);
+    try {
+      fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8');
+    } catch (e2) {
+      console.error('Error saving db file:', e2.message);
+    }
   }
 }
 
@@ -191,15 +208,16 @@ app.get('/api/user/playlists', authenticateToken, (req, res) => {
 
 app.post('/api/user/playlists', authenticateToken, (req, res) => {
   const userId = req.user.sub;
-  const { title, description, thumbnail, id } = req.body;
+  const { title, description, thumbnail, id, tracks } = req.body;
+  const initialTracks = Array.isArray(tracks) ? tracks : [];
   const newPlaylist = {
     id: id || `pl_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
     userId,
     title: title || 'My Playlist',
     description: description || '',
-    thumbnail: thumbnail || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80',
-    itemCount: 0,
-    tracks: [],
+    thumbnail: thumbnail || (initialTracks[0] ? initialTracks[0].thumbnail : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80'),
+    itemCount: initialTracks.length,
+    tracks: initialTracks,
     createdAt: new Date().toISOString()
   };
 
@@ -247,6 +265,26 @@ app.post('/api/user/playlists/:id/tracks', authenticateToken, (req, res) => {
   res.json({ success: true, count: pl.itemCount });
 });
 
+app.post('/api/user/playlists/:id/batch-tracks', authenticateToken, (req, res) => {
+  const userId = req.user.sub;
+  const pl = db.playlists.find(p => p.id === req.params.id && p.userId === userId);
+  if (!pl) return res.status(404).json({ detail: 'Playlist not found' });
+
+  const { tracks } = req.body;
+  if (!Array.isArray(tracks)) return res.status(400).json({ detail: 'tracks array required' });
+
+  if (!pl.tracks) pl.tracks = [];
+  const existingIds = new Set(pl.tracks.map(t => t.id));
+  const newTracks = tracks.filter(t => t && t.id && !existingIds.has(t.id));
+  pl.tracks.push(...newTracks);
+  pl.itemCount = pl.tracks.length;
+  if ((!pl.thumbnail || pl.thumbnail.includes('unsplash.com')) && pl.tracks[0]?.thumbnail) {
+    pl.thumbnail = pl.tracks[0].thumbnail;
+  }
+  saveDb();
+  res.json({ success: true, count: pl.itemCount, tracks: pl.tracks });
+});
+
 app.delete('/api/user/playlists/:id/tracks/:trackId', authenticateToken, (req, res) => {
   const userId = req.user.sub;
   const pl = db.playlists.find(p => p.id === req.params.id && p.userId === userId);
@@ -258,6 +296,68 @@ app.delete('/api/user/playlists/:id/tracks/:trackId', authenticateToken, (req, r
     saveDb();
   }
   res.json({ success: true, count: pl.itemCount });
+});
+
+// Full Library Cloud Sync (Merges local data into cloud account upon login/register)
+app.post('/api/user/sync', authenticateToken, (req, res) => {
+  const userId = req.user.sub;
+  const { localPlaylists, localFavorites, localHistory } = req.body || {};
+
+  // 1. Merge playlists
+  if (Array.isArray(localPlaylists) && localPlaylists.length > 0) {
+    localPlaylists.forEach(localPl => {
+      if (!localPl || !localPl.title) return;
+      const existing = db.playlists.find(p => (p.id === localPl.id || p.title.toLowerCase() === localPl.title.toLowerCase()) && p.userId === userId);
+      if (!existing) {
+        db.playlists.push({
+          id: localPl.id || `pl_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          userId,
+          title: localPl.title,
+          description: localPl.description || '',
+          thumbnail: localPl.thumbnail || (localPl.tracks?.[0]?.thumbnail) || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80',
+          itemCount: localPl.tracks?.length || 0,
+          tracks: Array.isArray(localPl.tracks) ? localPl.tracks : [],
+          createdAt: localPl.createdAt || new Date().toISOString()
+        });
+      }
+    });
+  }
+
+  // 2. Merge favorites
+  if (!db.favorites[userId]) db.favorites[userId] = [];
+  if (Array.isArray(localFavorites) && localFavorites.length > 0) {
+    const existingIds = new Set(db.favorites[userId].map(t => t.id));
+    localFavorites.forEach(fav => {
+      if (fav && fav.id && !existingIds.has(fav.id)) {
+        db.favorites[userId].unshift(fav);
+        existingIds.add(fav.id);
+      }
+    });
+  }
+
+  // 3. Merge history
+  if (!db.history[userId]) db.history[userId] = [];
+  if (Array.isArray(localHistory) && localHistory.length > 0) {
+    const existingIds = new Set(db.history[userId].map(t => t.id));
+    localHistory.forEach(item => {
+      if (item && item.id && !existingIds.has(item.id)) {
+        db.history[userId].push(item);
+        existingIds.add(item.id);
+      }
+    });
+    if (db.history[userId].length > 50) {
+      db.history[userId] = db.history[userId].slice(0, 50);
+    }
+  }
+
+  saveDb();
+
+  const userPlaylists = db.playlists.filter(p => p.userId === userId);
+  res.json({
+    playlists: userPlaylists,
+    favorites: db.favorites[userId] || [],
+    history: db.history[userId] || []
+  });
 });
 
 // ==========================================

@@ -75,11 +75,11 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="relative w-full max-w-md bg-[#121212] border border-[#282828] rounded-xl p-6 shadow-2xl text-white">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xl">
+      <div className="relative w-full max-w-md bg-[#0c0c0e]/90 backdrop-blur-2xl border border-white/[0.1] rounded-3xl p-6 sm:p-7 shadow-2xl text-white">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-white rounded-full hover:bg-[#282828] transition"
+          className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-white rounded-full hover:bg-white/[0.08] transition"
         >
           <X className="w-5 h-5" />
         </button>
@@ -87,7 +87,7 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
         {mode === 'create' && (
           <form onSubmit={handleCreate} className="space-y-4">
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-3 bg-[#1ed760]/10 text-[#1ed760] rounded-xl">
+              <div className="p-3 bg-[#1ed760]/10 text-[#1ed760] rounded-2xl border border-[#1ed760]/20">
                 <ListPlus className="w-6 h-6" />
               </div>
               <div>
@@ -108,7 +108,7 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
                 onChange={e => setTitle(e.target.value)}
                 placeholder="My playlist #1"
                 required
-                className="w-full px-4 py-2.5 bg-[#1e1e1e] border border-[#333] rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-[#1ed760] transition text-sm"
+                className="w-full px-4 py-2.5 bg-white/[0.05] border border-white/[0.08] focus:border-[#1ed760] rounded-xl text-white placeholder-zinc-500 focus:outline-none transition text-sm backdrop-blur-md"
                 autoFocus
               />
             </div>
@@ -122,7 +122,7 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
                 onChange={e => setDescription(e.target.value)}
                 placeholder="Add an optional description"
                 rows={2}
-                className="w-full px-4 py-2 bg-[#1e1e1e] border border-[#333] rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-[#1ed760] transition resize-none text-sm"
+                className="w-full px-4 py-2 bg-white/[0.05] border border-white/[0.08] focus:border-[#1ed760] rounded-xl text-white placeholder-zinc-500 focus:outline-none transition resize-none text-sm backdrop-blur-md"
               />
             </div>
 
@@ -137,7 +137,7 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
               <button
                 type="submit"
                 disabled={!title.trim()}
-                className="px-6 py-2.5 text-xs font-bold bg-[#1ed760] hover:bg-[#1fdf64] hover:scale-105 active:scale-95 disabled:opacity-50 text-black rounded-full transition shadow"
+                className="px-6 py-2.5 text-xs font-bold bg-[#1ed760] hover:bg-[#1fdf64] hover:scale-105 active:scale-95 disabled:opacity-50 text-black rounded-full transition shadow-lg"
               >
                 Create
               </button>
@@ -148,7 +148,7 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
         {mode === 'import' && (
           <form onSubmit={handleImport} className="space-y-4">
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-3 bg-[#1ed760]/10 text-[#1ed760] rounded-xl">
+              <div className="p-3 bg-[#1ed760]/10 text-[#1ed760] rounded-2xl border border-[#1ed760]/20">
                 <Download className="w-6 h-6" />
               </div>
               <div>
@@ -167,13 +167,13 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
                 onChange={e => setImportUrl(e.target.value)}
                 placeholder="Paste Spotify, YouTube, or public playlist link..."
                 required
-                className="w-full px-4 py-2.5 bg-[#1e1e1e] border border-[#333] rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-[#1ed760] transition text-sm"
+                className="w-full px-4 py-2.5 bg-white/[0.05] border border-white/[0.08] focus:border-[#1ed760] rounded-xl text-white placeholder-zinc-500 focus:outline-none transition text-sm backdrop-blur-md"
                 autoFocus
               />
             </div>
 
             {importError && (
-              <p className="text-xs text-red-400 bg-red-500/10 p-2.5 rounded-lg border border-red-500/20">
+              <p className="text-xs text-red-400 bg-red-500/10 p-2.5 rounded-xl border border-red-500/20">
                 {importError}
               </p>
             )}

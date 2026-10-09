@@ -39,8 +39,8 @@ export const TrackRow: React.FC<TrackRowProps> = ({
   return (
     <div
       onDoubleClick={handlePlay}
-      className={`group relative flex items-center justify-between px-2.5 sm:px-4 py-2 rounded-md transition select-none ${
-        isCurrent ? 'bg-[#282828]/70' : 'hover:bg-[#2a2a2a]/50'
+      className={`group relative flex items-center justify-between px-2.5 sm:px-4 py-2.5 rounded-xl transition-all duration-200 select-none ${
+        isCurrent ? 'bg-white/[0.08] backdrop-blur-md shadow-sm' : 'hover:bg-white/[0.04] backdrop-blur-sm'
       }`}
     >
       <div className="flex items-center gap-2.5 sm:gap-4 min-w-0 flex-1">
@@ -50,7 +50,7 @@ export const TrackRow: React.FC<TrackRowProps> = ({
             <Equalizer isPlaying={true} className="w-3.5 h-3.5" barColor="bg-[#1ed760]" />
           ) : (
             <>
-              <span className={`text-xs sm:text-sm group-hover:hidden font-mono ${isCurrent ? 'text-[#1ed760]' : 'text-[#b3b3b3]'}`}>
+              <span className={`text-xs sm:text-sm group-hover:hidden font-mono ${isCurrent ? 'text-[#1ed760] font-bold' : 'text-zinc-500'}`}>
                 {index + 1}
               </span>
               <button
@@ -66,7 +66,7 @@ export const TrackRow: React.FC<TrackRowProps> = ({
         {/* Thumbnail */}
         <div
           onClick={handlePlay}
-          className="relative w-10 h-10 rounded overflow-hidden shrink-0 cursor-pointer shadow bg-[#242424]"
+          className="relative w-10 h-10 rounded-lg overflow-hidden shrink-0 cursor-pointer shadow bg-black/40"
         >
           <img
             src={track.thumbnail || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80'}
@@ -86,7 +86,7 @@ export const TrackRow: React.FC<TrackRowProps> = ({
           >
             {track.title}
           </div>
-          <div className="text-xs text-[#b3b3b3] truncate mt-0.5 hover:underline hover:text-white cursor-pointer">
+          <div className="text-xs text-zinc-400 truncate mt-0.5 hover:underline hover:text-white cursor-pointer font-normal">
             {track.artist || 'Unknown Artist'}
           </div>
         </div>
@@ -102,14 +102,14 @@ export const TrackRow: React.FC<TrackRowProps> = ({
           className={`p-1 transition ${
             isFav
               ? 'text-[#1ed760]'
-              : 'text-[#b3b3b3] hover:text-white opacity-80 sm:opacity-0 sm:group-hover:opacity-100'
+              : 'text-zinc-500 hover:text-white opacity-80 sm:opacity-0 sm:group-hover:opacity-100'
           }`}
           title={isFav ? 'Remove from Liked Songs' : 'Save to Liked Songs'}
         >
           <Heart className={`w-4 h-4 ${isFav ? 'fill-current' : ''}`} />
         </button>
 
-        <span className="text-xs text-[#b3b3b3] font-mono w-9 sm:w-10 text-right">
+        <span className="text-xs text-zinc-400 font-mono w-9 sm:w-10 text-right">
           {track.durationFormatted || '3:30'}
         </span>
 
@@ -120,7 +120,7 @@ export const TrackRow: React.FC<TrackRowProps> = ({
               e.stopPropagation();
               setShowMenu(!showMenu);
             }}
-            className="p-1 text-[#b3b3b3] hover:text-white transition opacity-80 sm:opacity-0 sm:group-hover:opacity-100"
+            className="p-1 text-zinc-400 hover:text-white transition opacity-80 sm:opacity-0 sm:group-hover:opacity-100"
           >
             <MoreHorizontal className="w-5 h-5" />
           </button>
@@ -131,13 +131,13 @@ export const TrackRow: React.FC<TrackRowProps> = ({
                 className="fixed inset-0 z-40"
                 onClick={() => setShowMenu(false)}
               />
-              <div className="absolute right-0 top-full mt-1 w-48 bg-[#282828] border border-[#3e3e3e] rounded-md shadow-2xl py-1 z-50 text-xs text-white">
+              <div className="absolute right-0 top-full mt-1 w-48 bg-[#0c0c0e]/95 backdrop-blur-2xl border border-white/[0.1] rounded-2xl shadow-2xl py-1.5 z-50 text-xs text-white">
                 <button
                   onClick={() => {
                     playNextInQueue(track);
                     setShowMenu(false);
                   }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-[#3e3e3e] text-left transition"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.08] text-left transition"
                 >
                   <ListStart className="w-4 h-4 text-zinc-400" />
                   Play next
