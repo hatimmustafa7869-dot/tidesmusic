@@ -131,12 +131,21 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const shuffleRef = useRef<boolean>(shuffle);
   const nextTrackRef = useRef<() => void>(() => {});
   const prevTrackRef = useRef<() => void>(() => {});
+  const togglePlayRef = useRef<() => void>(() => {});
+  const seekRef = useRef<(sec: number) => void>(() => {});
+  const hasUserStartedPlaybackRef = useRef<boolean>(false);
+  const currentTimeRef = useRef<number>(currentTime);
+  const durationRef = useRef<number>(duration);
+  const isPlayingRef = useRef<boolean>(isPlaying);
 
   currentTrackRef.current = currentTrack;
   repeatRef.current = repeat;
   queueRef.current = queue;
   queueIndexRef.current = queueIndex;
   shuffleRef.current = shuffle;
+  currentTimeRef.current = currentTime;
+  durationRef.current = duration;
+  isPlayingRef.current = isPlaying;
 
   // Initialize YouTube IFrame Player API
   useEffect(() => {
@@ -147,7 +156,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           height: '1',
           width: '1',
           playerVars: {
-            autoplay: 1,
+            autoplay: 0,
             controls: 0,
             disablekb: 1,
             fs: 0,
@@ -269,6 +278,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const handleError = () => {
+      // Prevent autoplay: do not start YouTube engine if the user has not started playback
+      if (!hasUserStartedPlaybackRef.current) {
+        console.log('Audio stream error ignored before user has started playback');
+        return;
+      }
       console.warn('Audio stream failed, immediately activating YouTube Audio Engine');
       useYtEngineRef.current = true;
       if (currentTrackRef.current) {
@@ -298,14 +312,10 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, []);
 
-  // On mount: prepare loaded track from localStorage if present without auto-playing
+  // On mount: restore previously saved playback state without autoplaying
   useEffect(() => {
-    if (currentTrack && audioRef.current && !audioRef.current.src) {
-      audioRef.current.src = api.getStreamUrl(currentTrack.id);
-      if (currentTime > 0) {
-        audioRef.current.currentTime = currentTime;
-      }
-    }
+    setIsPlaying(false);
+    userExplicitPauseRef.current = true;
   }, []);
 
   // Persist playback state to localStorage for seamless page refreshes
@@ -431,71 +441,134 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, [isPlaying]);
 
-  // Synchronize MediaSession API for Native Lockscreen and Background Controls
+  // 1. Stable MediaSession Action Handlers Registration (Registered once to prevent device button disconnects)
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+
+    try {
+      navigator.mediaSession.setActionHandler('play', () => {
+        togglePlayRef.current();
+      });
+
+      navigator.mediaSession.setActionHandler('pause', () => {
+        togglePlayRef.current();
+      });
+
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        prevTrackRef.current();
+      });
+
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        nextTrackRef.current();
+      });
+
+      navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (details.seekTime !== undefined) {
+          seekRef.current(details.seekTime);
+        }
+      });
+
+      navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+        seekRef.current(Math.max(0, currentTimeRef.current - (details.seekOffset || 10)));
+      });
+
+      navigator.mediaSession.setActionHandler('seekforward', (details) => {
+        seekRef.current(Math.min(durationRef.current || 9999, currentTimeRef.current + (details.seekOffset || 10)));
+      });
+
+      navigator.mediaSession.setActionHandler('stop', () => {
+        if (isPlayingRef.current) {
+          togglePlayRef.current();
+        }
+      });
+    } catch (e) {
+      console.warn('MediaSession action handler registration error:', e);
+    }
+  }, []);
+
+  // 2. Synchronize MediaSession Metadata (Title, Artist, High-Res Artwork)
   useEffect(() => {
     if (!currentTrack || !('mediaSession' in navigator)) return;
 
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: currentTrack.title,
-      artist: currentTrack.artist || 'Unknown Artist',
-      album: 'Tides Music',
-      artwork: [
-        { src: currentTrack.thumbnail, sizes: '96x96', type: 'image/jpeg' },
-        { src: currentTrack.thumbnail, sizes: '128x128', type: 'image/jpeg' },
-        { src: currentTrack.thumbnail, sizes: '192x192', type: 'image/jpeg' },
-        { src: currentTrack.thumbnail, sizes: '256x256', type: 'image/jpeg' },
-        { src: currentTrack.thumbnail, sizes: '512x512', type: 'image/jpeg' },
-      ],
-    });
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentTrack.title,
+        artist: currentTrack.artist || 'Unknown Artist',
+        album: 'Tides Music',
+        artwork: [
+          { src: currentTrack.thumbnail, sizes: '96x96', type: 'image/jpeg' },
+          { src: currentTrack.thumbnail, sizes: '128x128', type: 'image/jpeg' },
+          { src: currentTrack.thumbnail, sizes: '192x192', type: 'image/jpeg' },
+          { src: currentTrack.thumbnail, sizes: '256x256', type: 'image/jpeg' },
+          { src: currentTrack.thumbnail, sizes: '384x384', type: 'image/jpeg' },
+          { src: currentTrack.thumbnail, sizes: '512x512', type: 'image/jpeg' },
+        ],
+      });
+    } catch (e) {
+      console.warn('MediaSession metadata update error:', e);
+    }
+  }, [currentTrack?.id, currentTrack?.title, currentTrack?.artist, currentTrack?.thumbnail]);
 
-    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+  // 3. Synchronize MediaSession Playback State
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+    try {
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+    } catch (e) {}
+  }, [isPlaying]);
 
-    navigator.mediaSession.setActionHandler('play', () => {
-      userExplicitPauseRef.current = false;
-      if (activeEngineRef.current === 'yt' && ytPlayerRef.current) {
-        ytPlayerRef.current.playVideo();
-        setIsPlaying(true);
-      } else if (audioRef.current) {
-        audioRef.current.play().catch(console.error);
-        setIsPlaying(true);
+  // 4. Global Hardware & Headset Media Keys Listener (Physical buttons on earbuds, headphones, Android, keyboard)
+  useEffect(() => {
+    const handleHardwareMediaKey = (e: KeyboardEvent) => {
+      const isPlayPause =
+        e.key === 'MediaPlayPause' ||
+        e.code === 'MediaPlayPause' ||
+        e.keyCode === 85 ||
+        e.keyCode === 179 ||
+        e.key === 'HeadsetHook' ||
+        e.code === 'HeadsetHook' ||
+        e.keyCode === 79;
+
+      const isNext =
+        e.key === 'MediaTrackNext' ||
+        e.code === 'MediaTrackNext' ||
+        e.keyCode === 87 ||
+        e.keyCode === 176;
+
+      const isPrev =
+        e.key === 'MediaTrackPrevious' ||
+        e.code === 'MediaTrackPrevious' ||
+        e.keyCode === 88 ||
+        e.keyCode === 177;
+
+      const isStop =
+        e.key === 'MediaStop' ||
+        e.code === 'MediaStop' ||
+        e.keyCode === 86 ||
+        e.keyCode === 178;
+
+      if (isPlayPause) {
+        e.preventDefault();
+        togglePlayRef.current();
+      } else if (isNext) {
+        e.preventDefault();
+        nextTrackRef.current();
+      } else if (isPrev) {
+        e.preventDefault();
+        prevTrackRef.current();
+      } else if (isStop) {
+        e.preventDefault();
+        if (isPlayingRef.current) togglePlayRef.current();
       }
-      navigator.mediaSession.playbackState = 'playing';
-    });
+    };
 
-    navigator.mediaSession.setActionHandler('pause', () => {
-      userExplicitPauseRef.current = true;
-      if (activeEngineRef.current === 'yt' && ytPlayerRef.current) {
-        ytPlayerRef.current.pauseVideo();
-        setIsPlaying(false);
-      } else if (audioRef.current) {
-        audioRef.current.pause();
-        setIsPlaying(false);
-      }
-      navigator.mediaSession.playbackState = 'paused';
-    });
+    window.addEventListener('keydown', handleHardwareMediaKey);
+    return () => {
+      window.removeEventListener('keydown', handleHardwareMediaKey);
+    };
+  }, []);
 
-    navigator.mediaSession.setActionHandler('previoustrack', () => prevTrackRef.current());
-    navigator.mediaSession.setActionHandler('nexttrack', () => nextTrackRef.current());
-    navigator.mediaSession.setActionHandler('seekto', (details) => {
-      if (details.seekTime !== undefined) seek(details.seekTime);
-    });
-    navigator.mediaSession.setActionHandler('seekbackward', (details) => {
-      seek(Math.max(0, currentTime - (details.seekOffset || 10)));
-    });
-    navigator.mediaSession.setActionHandler('seekforward', (details) => {
-      seek(Math.min(duration || 9999, currentTime + (details.seekOffset || 10)));
-    });
-    navigator.mediaSession.setActionHandler('stop', () => {
-      userExplicitPauseRef.current = true;
-      if (activeEngineRef.current === 'yt' && ytPlayerRef.current) ytPlayerRef.current.pauseVideo();
-      else if (audioRef.current) audioRef.current.pause();
-      setIsPlaying(false);
-      setCurrentTime(0);
-      navigator.mediaSession.playbackState = 'paused';
-    });
-  }, [currentTrack, currentTime, duration, isPlaying]);
-
-  // Synchronize Android Native App Foreground Service Bridge
+  // 5. Synchronize Android Native App Foreground Service Bridge
   useEffect(() => {
     const androidBridge = (window as any).AndroidBridge;
     if (androidBridge && currentTrack) {
@@ -512,48 +585,46 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [currentTrack, isPlaying]);
 
-  // Expose global controls for Android Native Bridge
+  // 6. Expose global controls for Android Native Bridge & External Events
   useEffect(() => {
     (window as any).AndroidControls = {
       play: () => {
-        userExplicitPauseRef.current = false;
-        if (activeEngineRef.current === 'yt' && ytPlayerRef.current) {
-          ytPlayerRef.current.playVideo();
-        } else if (audioRef.current) {
-          audioRef.current.play().catch(console.error);
-        }
-        setIsPlaying(true);
+        if (!isPlayingRef.current) togglePlayRef.current();
       },
       pause: () => {
-        userExplicitPauseRef.current = true;
-        if (activeEngineRef.current === 'yt' && ytPlayerRef.current) {
-          ytPlayerRef.current.pauseVideo();
-        } else if (audioRef.current) {
-          audioRef.current.pause();
-        }
-        setIsPlaying(false);
+        if (isPlayingRef.current) togglePlayRef.current();
       },
+      togglePlay: () => togglePlayRef.current(),
       next: () => nextTrackRef.current(),
       prev: () => prevTrackRef.current(),
-      seek: (sec: number) => seek(sec)
+      seek: (sec: number) => seekRef.current(sec)
     };
 
     const handleNativeControl = (e: any) => {
       const action = e.detail?.action;
-      if (action === 'play') (window as any).AndroidControls?.play();
-      else if (action === 'pause') (window as any).AndroidControls?.pause();
-      else if (action === 'next') nextTrackRef.current();
-      else if (action === 'prev') prevTrackRef.current();
+      if (action === 'play') {
+        if (!isPlayingRef.current) togglePlayRef.current();
+      } else if (action === 'pause') {
+        if (isPlayingRef.current) togglePlayRef.current();
+      } else if (action === 'toggle') {
+        togglePlayRef.current();
+      } else if (action === 'next') {
+        nextTrackRef.current();
+      } else if (action === 'prev') {
+        prevTrackRef.current();
+      }
     };
 
     window.addEventListener('nativeMediaControl', handleNativeControl);
     return () => {
       window.removeEventListener('nativeMediaControl', handleNativeControl);
     };
-  }, [currentTrack, queue, queueIndex]);
+  }, []);
 
   // Playback execution via YouTube Engine
   const playWithYouTube = (track: Track, startTime: number = 0) => {
+    hasUserStartedPlaybackRef.current = true;
+    userExplicitPauseRef.current = false;
     activeEngineRef.current = 'yt';
     useYtEngineRef.current = true;
 
@@ -592,6 +663,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Load and play a specific track
   const loadAndPlayTrack = (track: Track) => {
+    hasUserStartedPlaybackRef.current = true;
+    userExplicitPauseRef.current = false;
     const audio = audioRef.current;
     if (!audio) return;
 
@@ -758,6 +831,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const playPlaylist = (tracks: Track[], startIndex: number = 0) => {
     if (!tracks || tracks.length === 0) return;
+    hasUserStartedPlaybackRef.current = true;
+    userExplicitPauseRef.current = false;
     setQueue(tracks);
     queueRef.current = tracks;
     const validIndex = Math.max(0, Math.min(startIndex, tracks.length - 1));
@@ -771,6 +846,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const togglePlay = () => {
     if (!currentTrack) return;
+    hasUserStartedPlaybackRef.current = true;
     const nextPlay = !isPlaying;
     userExplicitPauseRef.current = isPlaying;
 
@@ -779,8 +855,26 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       else ytPlayerRef.current.playVideo();
       setIsPlaying(nextPlay);
     } else if (audioRef.current) {
-      if (isPlaying) audioRef.current.pause();
-      else audioRef.current.play().catch(console.error);
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        // If audio src hasn't been set yet (restored from previous session without autoplay)
+        if (!audioRef.current.src || audioRef.current.src === '' || audioRef.current.src === window.location.href) {
+          const streamUrl = api.getStreamUrl(currentTrack.id);
+          audioRef.current.src = streamUrl;
+          if (currentTime > 0) {
+            audioRef.current.currentTime = currentTime;
+          }
+          audioRef.current.load();
+        }
+        audioRef.current.play().then(() => {
+          setIsPlaying(true);
+        }).catch((err) => {
+          console.warn('Audio play error, falling back to YouTube:', err);
+          playWithYouTube(currentTrack, currentTime);
+        });
+      }
     }
 
     if ('mediaSession' in navigator) {
@@ -862,6 +956,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   nextTrackRef.current = nextTrack;
   prevTrackRef.current = prevTrack;
+  togglePlayRef.current = togglePlay;
 
   const seek = (seconds: number) => {
     const validSec = Math.max(0, isNaN(seconds) ? 0 : seconds);
@@ -871,6 +966,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       ytPlayerRef.current.seekTo(validSec, true);
     } else if (audioRef.current) {
       try {
+        if ((!audioRef.current.src || audioRef.current.src === window.location.href) && currentTrack) {
+          audioRef.current.src = api.getStreamUrl(currentTrack.id);
+        }
         audioRef.current.currentTime = validSec;
       } catch (e) {
         console.warn('Seek error:', e);
@@ -881,6 +979,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       playbackEventListenerRef.current?.({ type: 'SEEK', current_time: validSec });
     }
   };
+
+  seekRef.current = seek;
 
   const setVolume = (vol: number) => {
     const clamped = Math.max(0, Math.min(1, vol));

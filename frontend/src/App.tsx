@@ -43,10 +43,59 @@ export const MainApp: React.FC = () => {
   const { togglePlay, seek, currentTime, duration, setVolume, volume, toggleMute, nextTrack, prevTrack } = useAudio();
   const { isJamActive, setIsJamModalOpen } = useJam();
 
-  // Keyboard Shortcuts (Spotify Standard)
+  // Keyboard & Hardware Media Keys Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in an input field
+      // Hardware Media Keys should work even if focused in inputs
+      const isPlayPause =
+        e.key === 'MediaPlayPause' ||
+        e.code === 'MediaPlayPause' ||
+        e.keyCode === 85 ||
+        e.keyCode === 179 ||
+        e.key === 'HeadsetHook' ||
+        e.code === 'HeadsetHook' ||
+        e.keyCode === 79;
+
+      const isNext =
+        e.key === 'MediaTrackNext' ||
+        e.code === 'MediaTrackNext' ||
+        e.keyCode === 87 ||
+        e.keyCode === 176;
+
+      const isPrev =
+        e.key === 'MediaTrackPrevious' ||
+        e.code === 'MediaTrackPrevious' ||
+        e.keyCode === 88 ||
+        e.keyCode === 177;
+
+      const isStop =
+        e.key === 'MediaStop' ||
+        e.code === 'MediaStop' ||
+        e.keyCode === 86 ||
+        e.keyCode === 178;
+
+      if (isPlayPause) {
+        e.preventDefault();
+        togglePlay();
+        return;
+      }
+      if (isNext) {
+        e.preventDefault();
+        nextTrack();
+        return;
+      }
+      if (isPrev) {
+        e.preventDefault();
+        prevTrack();
+        return;
+      }
+      if (isStop) {
+        e.preventDefault();
+        togglePlay();
+        return;
+      }
+
+      // Ignore standard typing keys if typing in an input field
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
         return;
       }
