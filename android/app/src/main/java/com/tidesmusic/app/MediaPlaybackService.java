@@ -29,12 +29,15 @@ public class MediaPlaybackService extends Service {
 
     public static final String ACTION_START_OR_UPDATE = "com.tidesmusic.app.START_OR_UPDATE";
     public static final String ACTION_UPDATE_STATE = "com.tidesmusic.app.UPDATE_STATE";
+    public static final String ACTION_UPDATE_POSITION = "com.tidesmusic.app.UPDATE_POSITION";
     public static final String ACTION_STOP = "com.tidesmusic.app.STOP";
 
     public static final String EXTRA_TITLE = "extra_title";
     public static final String EXTRA_ARTIST = "extra_artist";
     public static final String EXTRA_COVER_URL = "extra_cover_url";
     public static final String EXTRA_IS_PLAYING = "extra_is_playing";
+    public static final String EXTRA_DURATION = "extra_duration";
+    public static final String EXTRA_POSITION = "extra_position";
 
     private PowerManager.WakeLock wakeLock;
     private MediaSessionCompat mediaSession;
@@ -45,6 +48,8 @@ public class MediaPlaybackService extends Service {
     private Bitmap currentCoverBitmap = null;
     private boolean isPlaying = false;
     private boolean isForegroundServiceStarted = false;
+    private long currentDurationMs = 0L;
+    private long currentPositionMs = 0L;
 
     @Override
     public void onCreate() {
@@ -104,11 +109,41 @@ public class MediaPlaybackService extends Service {
 
             @Override
             public void onSeekTo(long pos) {
+                currentPositionMs = pos;
                 Intent intent = new Intent(MediaNotificationReceiver.BROADCAST_WEB_CONTROL);
                 intent.setPackage(getPackageName());
                 intent.putExtra(MediaNotificationReceiver.EXTRA_ACTION, "seek");
                 intent.putExtra("seek_position", pos / 1000.0);
                 sendBroadcast(intent);
+            }
+
+            @Override
+            public boolean onMediaButtonEvent(Intent mediaButtonEvent) {
+                if (mediaButtonEvent != null && Intent.ACTION_MEDIA_BUTTON.equals(mediaButtonEvent.getAction())) {
+                    android.view.KeyEvent event = mediaButtonEvent.getParcelableExtra(Intent.EXTRA_KEY_EVENT);
+                    if (event != null && event.getAction() == android.view.KeyEvent.ACTION_DOWN) {
+                        int keyCode = event.getKeyCode();
+                        if (keyCode == android.view.KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == android.view.KeyEvent.KEYCODE_MEDIA_FAST_FORWARD) {
+                            sendControlBroadcast("next");
+                            return true;
+                        } else if (keyCode == android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS || keyCode == android.view.KeyEvent.KEYCODE_MEDIA_REWIND) {
+                            sendControlBroadcast("prev");
+                            return true;
+                        } else if (keyCode == android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == android.view.KeyEvent.KEYCODE_HEADSETHOOK) {
+                            sendControlBroadcast("toggle");
+                            return true;
+                        } else if (keyCode == android.view.KeyEvent.KEYCODE_MEDIA_PLAY) {
+                            sendControlBroadcast("play");
+                            updatePlaybackState(true);
+                            return true;
+                        } else if (keyCode == android.view.KeyEvent.KEYCODE_MEDIA_PAUSE) {
+                            sendControlBroadcast("pause");
+                            updatePlaybackState(false);
+                            return true;
+                        }
+                    }
+                }
+                return super.onMediaButtonEvent(mediaButtonEvent);
             }
         });
         mediaSession.setActive(true);
@@ -139,6 +174,8 @@ public class MediaPlaybackService extends Service {
             String newArtist = intent.getStringExtra(EXTRA_ARTIST);
             String newCover = intent.getStringExtra(EXTRA_COVER_URL);
             boolean newPlaying = intent.getBooleanExtra(EXTRA_IS_PLAYING, true);
+            currentDurationMs = intent.getLongExtra(EXTRA_DURATION, currentDurationMs);
+            currentPositionMs = intent.getLongExtra(EXTRA_POSITION, 0L);
 
             if (newTitle != null) currentTitle = newTitle;
             if (newArtist != null) currentArtist = newArtist;
@@ -163,6 +200,10 @@ public class MediaPlaybackService extends Service {
             } else {
                 releaseWakeLock();
             }
+            updateNotificationAndSession();
+        } else if (ACTION_UPDATE_POSITION.equals(action)) {
+            currentPositionMs = intent.getLongExtra(EXTRA_POSITION, currentPositionMs);
+            currentDurationMs = intent.getLongExtra(EXTRA_DURATION, currentDurationMs);
             updateNotificationAndSession();
         }
 
@@ -212,13 +253,17 @@ public class MediaPlaybackService extends Service {
                         PlaybackStateCompat.ACTION_STOP |
                         PlaybackStateCompat.ACTION_SEEK_TO)
                 .setState(isPlaying ? PlaybackStateCompat.STATE_PLAYING : PlaybackStateCompat.STATE_PAUSED,
-                        PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1.0f);
+                        currentPositionMs, 1.0f);
         mediaSession.setPlaybackState(stateBuilder.build());
 
         MediaMetadataCompat.Builder metaBuilder = new MediaMetadataCompat.Builder()
                 .putString(MediaMetadataCompat.METADATA_KEY_TITLE, currentTitle)
                 .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, currentArtist)
                 .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, "Tides Music");
+
+        if (currentDurationMs > 0) {
+            metaBuilder.putLong(MediaMetadataCompat.METADATA_KEY_DURATION, currentDurationMs);
+        }
 
         if (currentCoverBitmap != null) {
             metaBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, currentCoverBitmap);
@@ -340,7 +385,7 @@ public class MediaPlaybackService extends Service {
         return null;
     }
 
-    public static void startWithTrack(Context context, String title, String artist, String coverUrl, boolean isPlaying) {
+    public static void startWithTrack(Context context, String title, String artist, String coverUrl, boolean isPlaying, long durationMs) {
         try {
             Intent intent = new Intent(context, MediaPlaybackService.class);
             intent.setAction(ACTION_START_OR_UPDATE);
@@ -348,12 +393,29 @@ public class MediaPlaybackService extends Service {
             intent.putExtra(EXTRA_ARTIST, artist);
             intent.putExtra(EXTRA_COVER_URL, coverUrl);
             intent.putExtra(EXTRA_IS_PLAYING, isPlaying);
+            intent.putExtra(EXTRA_DURATION, durationMs);
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent);
             } else {
                 context.startService(intent);
             }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void startWithTrack(Context context, String title, String artist, String coverUrl, boolean isPlaying) {
+        startWithTrack(context, title, artist, coverUrl, isPlaying, 0L);
+    }
+
+    public static void updatePosition(Context context, long positionMs, long durationMs) {
+        try {
+            Intent intent = new Intent(context, MediaPlaybackService.class);
+            intent.setAction(ACTION_UPDATE_POSITION);
+            intent.putExtra(EXTRA_POSITION, positionMs);
+            intent.putExtra(EXTRA_DURATION, durationMs);
+            context.startService(intent);
         } catch (Exception e) {
             e.printStackTrace();
         }

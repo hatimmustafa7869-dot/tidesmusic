@@ -179,6 +179,54 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const lastBridgePositionUpdateRef = useRef<number>(0);
+  const sendBridgePositionUpdate = (posSec: number, durSec: number) => {
+    const androidBridge = (window as any).AndroidBridge;
+    if (!androidBridge || typeof androidBridge.onPositionUpdate !== 'function') return;
+    const now = Date.now();
+    if (now - lastBridgePositionUpdateRef.current < 1000) return;
+    lastBridgePositionUpdateRef.current = now;
+    if (Number.isFinite(posSec) && posSec >= 0 && Number.isFinite(durSec) && durSec > 0) {
+      try {
+        androidBridge.onPositionUpdate(Math.round(posSec * 1000), Math.round(durSec * 1000));
+      } catch {}
+    }
+  };
+
+  const isFetchingUpNextRef = useRef<boolean>(false);
+  const prefetchQueueIfNeeded = async (track: Track, currentQ: Track[], currentIdx: number) => {
+    if (!track || !track.id) return;
+    const remainingAhead = currentQ.length - 1 - currentIdx;
+    if (remainingAhead >= 4 || isFetchingUpNextRef.current) return;
+
+    isFetchingUpNextRef.current = true;
+    try {
+      let targetId = track.id;
+      if (!/^[a-zA-Z0-9_-]{11}$/.test(targetId)) {
+        try {
+          const resolved = await api.resolveTrackId(track);
+          if (resolved && /^[a-zA-Z0-9_-]{11}$/.test(resolved)) {
+            targetId = resolved;
+          }
+        } catch {}
+      }
+      const upNext = await api.getUpNext(targetId);
+      if (upNext && upNext.length > 0) {
+        const existingIds = new Set(queueRef.current.map(t => t.id));
+        const newTracks = upNext.filter(t => t.id && !existingIds.has(t.id));
+        if (newTracks.length > 0) {
+          const updated = [...queueRef.current, ...newTracks];
+          setQueue(updated);
+          queueRef.current = updated;
+        }
+      }
+    } catch (err) {
+      console.warn('Queue prefetch error:', err);
+    } finally {
+      isFetchingUpNextRef.current = false;
+    }
+  };
+
   // Initialize YouTube IFrame Player API
   useEffect(() => {
     const initYT = () => {
@@ -316,6 +364,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           stallTimeoutRef.current = null;
         }
         updateMediaSessionPosition(audio.currentTime, audio.duration);
+        sendBridgePositionUpdate(audio.currentTime, audio.duration);
       }
     };
 
@@ -448,6 +497,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             setCurrentTime(t);
             if (typeof d === 'number' && d > 0) {
               updateMediaSessionPosition(t, d);
+              sendBridgePositionUpdate(t, d);
             }
           }
           if (typeof d === 'number' && d > 0) {
@@ -633,21 +683,32 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     try {
       const coverUrl = getAbsoluteArtworkUrl(currentTrack.thumbnail);
+      const durMs = Math.round((currentTrack.duration || duration || 0) * 1000);
       if (lastReportedTrackIdRef.current !== currentTrack.id) {
         lastReportedTrackIdRef.current = currentTrack.id;
-        androidBridge.onTrackChange(
-          currentTrack.title,
-          currentTrack.artist || 'Unknown Artist',
-          coverUrl,
-          isPlaying
-        );
+        try {
+          androidBridge.onTrackChange(
+            currentTrack.title,
+            currentTrack.artist || 'Unknown Artist',
+            coverUrl,
+            isPlaying,
+            durMs
+          );
+        } catch {
+          androidBridge.onTrackChange(
+            currentTrack.title,
+            currentTrack.artist || 'Unknown Artist',
+            coverUrl,
+            isPlaying
+          );
+        }
       } else {
         androidBridge.onPlaybackStateChange(isPlaying);
       }
     } catch (err) {
       console.warn('AndroidBridge track update error:', err);
     }
-  }, [currentTrack?.id, currentTrack?.title, currentTrack?.artist, currentTrack?.thumbnail, isPlaying]);
+  }, [currentTrack?.id, currentTrack?.title, currentTrack?.artist, currentTrack?.thumbnail, isPlaying, duration]);
 
   // 6. Expose global controls for Android Native Bridge & External Events
   useEffect(() => {
@@ -775,6 +836,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         console.warn('Track pre-resolve warning:', err);
       }
     }
+
+    // Prefetch upcoming tracks in the background so next track changes are always instant
+    prefetchQueueIfNeeded(activeTrack, queueRef.current, queueIndexRef.current);
 
     // If YouTube engine was already chosen (e.g. host blocks direct audio streams), play directly
     if (useYtEngineRef.current) {
@@ -905,18 +969,22 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const playTrack = (track: Track, newQueue?: Track[]) => {
+    let targetQ = queueRef.current;
+    let targetIdx = 0;
     if (newQueue && newQueue.length > 0) {
       setQueue(newQueue);
       queueRef.current = newQueue;
       const idx = newQueue.findIndex(t => t.id === track.id);
-      const targetIdx = idx !== -1 ? idx : 0;
+      targetIdx = idx !== -1 ? idx : 0;
       setQueueIndex(targetIdx);
       queueIndexRef.current = targetIdx;
+      targetQ = newQueue;
     } else {
       const existingIdx = queueRef.current.findIndex(t => t.id === track.id);
       if (existingIdx !== -1) {
         setQueueIndex(existingIdx);
         queueIndexRef.current = existingIdx;
+        targetIdx = existingIdx;
       } else {
         // Fresh standalone track play: reset queue so stale leftover tracks are cleared
         const nextQ = [track];
@@ -924,9 +992,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         queueRef.current = nextQ;
         setQueueIndex(0);
         queueIndexRef.current = 0;
+        targetQ = nextQ;
+        targetIdx = 0;
       }
     }
     loadAndPlayTrack(track);
+    prefetchQueueIfNeeded(track, targetQ, targetIdx);
     if (!isSyncingFromRemoteRef.current) {
       playbackEventListenerRef.current?.({ type: 'PLAY_TRACK', track, queue: newQueue || queueRef.current });
     }
@@ -942,6 +1013,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setQueueIndex(validIndex);
     queueIndexRef.current = validIndex;
     loadAndPlayTrack(tracks[validIndex]);
+    prefetchQueueIfNeeded(tracks[validIndex], tracks, validIndex);
     if (!isSyncingFromRemoteRef.current) {
       playbackEventListenerRef.current?.({ type: 'PLAY_TRACK', track: tracks[validIndex], queue: tracks, queue_index: validIndex });
     }
@@ -1001,7 +1073,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const nextTrack = async () => {
+  const nextTrack = () => {
     const currentQ = queueRef.current;
     const currentIdx = queueIndexRef.current;
     if (currentQ.length === 0) return;
@@ -1014,6 +1086,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setQueueIndex(randIdx);
       queueIndexRef.current = randIdx;
       loadAndPlayTrack(currentQ[randIdx]);
+      prefetchQueueIfNeeded(currentQ[randIdx], currentQ, randIdx);
       return;
     }
 
@@ -1022,34 +1095,38 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setQueueIndex(nextIdx);
       queueIndexRef.current = nextIdx;
       loadAndPlayTrack(currentQ[nextIdx]);
+      prefetchQueueIfNeeded(currentQ[nextIdx], currentQ, nextIdx);
     } else {
-      if (repeatRef.current === 'all') {
+      if (repeatRef.current === 'all' || currentQ.length > 1) {
         setQueueIndex(0);
         queueIndexRef.current = 0;
         loadAndPlayTrack(currentQ[0]);
+        prefetchQueueIfNeeded(currentQ[0], currentQ, 0);
       } else if (currentTrackRef.current) {
         setIsLoading(true);
-        try {
-          const upNext = await api.getUpNext(currentTrackRef.current.id);
-          if (upNext.length > 0) {
+        api.getUpNext(currentTrackRef.current.id).then((upNext) => {
+          if (upNext && upNext.length > 0) {
             const merged = [...queueRef.current, ...upNext];
             setQueue(merged);
             queueRef.current = merged;
-            setQueueIndex(nextIdx);
-            queueIndexRef.current = nextIdx;
+            setQueueIndex(1);
+            queueIndexRef.current = 1;
             loadAndPlayTrack(upNext[0]);
+            prefetchQueueIfNeeded(upNext[0], merged, 1);
           } else {
+            seek(0);
             setIsLoading(false);
           }
-        } catch {
+        }).catch(() => {
+          seek(0);
           setIsLoading(false);
-        }
+        });
       }
     }
   };
 
   const prevTrack = () => {
-    if (currentTime > 3) {
+    if (currentTimeRef.current > 3) {
       seek(0);
       return;
     }
@@ -1062,10 +1139,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setQueueIndex(prevIdx);
       queueIndexRef.current = prevIdx;
       loadAndPlayTrack(currentQ[prevIdx]);
+    } else if (currentQ.length > 1) {
+      const lastIdx = currentQ.length - 1;
+      setQueueIndex(lastIdx);
+      queueIndexRef.current = lastIdx;
+      loadAndPlayTrack(currentQ[lastIdx]);
     } else {
-      setQueueIndex(0);
-      queueIndexRef.current = 0;
-      if (currentQ[0]) loadAndPlayTrack(currentQ[0]);
+      seek(0);
     }
   };
 

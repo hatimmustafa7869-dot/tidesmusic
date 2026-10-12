@@ -11,13 +11,23 @@ public class WebAppInterface {
     }
 
     @JavascriptInterface
+    public void onTrackChange(String title, String artist, String coverUrl, boolean isPlaying, long durationMs) {
+        MediaPlaybackService.startWithTrack(context, title, artist, coverUrl, isPlaying, durationMs);
+    }
+
+    @JavascriptInterface
     public void onTrackChange(String title, String artist, String coverUrl, boolean isPlaying) {
-        MediaPlaybackService.startWithTrack(context, title, artist, coverUrl, isPlaying);
+        MediaPlaybackService.startWithTrack(context, title, artist, coverUrl, isPlaying, 0L);
     }
 
     @JavascriptInterface
     public void onPlaybackStateChange(boolean isPlaying) {
         MediaPlaybackService.updateState(context, isPlaying);
+    }
+
+    @JavascriptInterface
+    public void onPositionUpdate(long positionMs, long durationMs) {
+        MediaPlaybackService.updatePosition(context, positionMs, durationMs);
     }
 
     @JavascriptInterface

@@ -215,7 +215,7 @@ public class MainActivity extends AppCompatActivity {
                 action, action, action, action
             );
         }
-        webView.evaluateJavascript(js, null);
+        webView.post(() -> webView.evaluateJavascript(js, null));
     }
 
     @Override
