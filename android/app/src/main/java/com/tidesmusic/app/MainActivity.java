@@ -144,8 +144,15 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                // Inject native app identifier into JS environment
-                view.evaluateJavascript("window.isNativeTidesApp = true;", null);
+                // Inject native app identifier and keepalive visibility overrides into JS environment
+                view.evaluateJavascript(
+                    "window.isNativeTidesApp = true;" +
+                    "try {" +
+                    "  Object.defineProperty(document, 'hidden', { get: () => false, configurable: true });" +
+                    "  Object.defineProperty(document, 'visibilityState', { get: () => 'visible', configurable: true });" +
+                    "} catch(e) {}",
+                    null
+                );
             }
 
             @Override

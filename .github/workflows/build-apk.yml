@@ -71,8 +71,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: success()
         with:
-          tag_name: v1.0.0
-          name: "Tides Music Android App v1.0.0"
+          tag_name: v1.0.1
+          name: "Tides Music Android App v1.0.1"
           body: |
             ## 🌊 Tides Music Official Android Application
             

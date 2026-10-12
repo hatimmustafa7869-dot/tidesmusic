@@ -13,6 +13,12 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <link rel="manifest" href="/manifest.json" />
+    <script>
+      try {
+        Object.defineProperty(document, 'hidden', { get: () => false, configurable: true });
+        Object.defineProperty(document, 'visibilityState', { get: () => 'visible', configurable: true });
+      } catch (e) {}
+    </script>
     <script src="https://www.youtube.com/iframe_api"></script>
     <title>Tides Music</title>
   </head>

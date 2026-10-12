@@ -1702,7 +1702,7 @@ app.get(['/downloads/TidesMusic.apk', '/download/apk', '/api/download/apk'], (re
     return res.sendFile(fileToServe);
   }
   // Redirect to GitHub release CDN if local file is missing
-  return res.redirect('https://github.com/hatimmustafa7869-dot/tidesmusic/releases/download/v1.0.0/TidesMusic.apk');
+  return res.redirect('https://github.com/hatimmustafa7869-dot/tidesmusic/releases/download/v1.0.1/TidesMusic.apk');
 });
 
 const distPath = path.join(__dirname, 'frontend', 'dist');
