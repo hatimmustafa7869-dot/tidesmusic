@@ -1,12 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ArrowDownCircle,
   Check,
   ChevronRight,
   Clock,
   Copy,
-  ExternalLink,
-  Folder,
   Globe,
   ListFilter,
   ListMusic,
@@ -23,9 +22,7 @@ import {
   Share2,
   Shuffle,
   User,
-  UserPlus,
-  X,
-  XCircle
+  X
 } from 'lucide-react';
 import { TrackRow } from '../components/TrackRow';
 import { useAudio } from '../context/AudioContext';
@@ -63,16 +60,13 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
 
   // Spotify-style dropdown & modals state
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [activeSubmenu, setActiveSubmenu] = useState<'folder' | 'other_playlist' | 'share' | null>(null);
+  const [activeSubmenu, setActiveSubmenu] = useState<'other_playlist' | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isCollabOpen, setIsCollabOpen] = useState(false);
   const [isAddSongsOpen, setIsAddSongsOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
 
   // Playlist options state
   const [isPrivate, setIsPrivate] = useState(false);
-  const [isProfileHidden, setIsProfileHidden] = useState(false);
-  const [isTasteExcluded, setIsTasteExcluded] = useState(false);
   const [isDownloaded, setIsDownloaded] = useState(false);
   const [sortBy, setSortBy] = useState<'custom' | 'title' | 'artist' | 'duration'>('custom');
 
@@ -231,14 +225,7 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
     }
   };
 
-  // Option 2: Remove/Add profile
-  const handleToggleProfile = () => {
-    setIsProfileHidden(prev => !prev);
-    setIsMenuOpen(false);
-    showToast(isProfileHidden ? 'Playlist added to your profile' : 'Playlist removed from your profile');
-  };
-
-  // Option 3: Edit details
+  // Option 2: Edit details
   const handleOpenEdit = () => {
     setEditTitle(playlistData.title);
     setEditDesc(playlistData.description || '');
@@ -261,7 +248,7 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
     showToast('Playlist details updated');
   };
 
-  // Option 4: Delete
+  // Option 3: Delete
   const handleDeletePlaylist = () => {
     setIsMenuOpen(false);
     if (confirm(`Delete "${playlistData.title}" from your library?`)) {
@@ -271,7 +258,7 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
     }
   };
 
-  // Option 5: Download playlist
+  // Option 4: Download playlist
   const handleDownload = () => {
     setIsDownloaded(prev => !prev);
     setIsMenuOpen(false);
@@ -293,34 +280,14 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
     }
   };
 
-  // Option 6: Make private / public
+  // Option 5: Make private / public
   const handleTogglePrivacy = () => {
     setIsPrivate(prev => !prev);
     setIsMenuOpen(false);
     showToast(isPrivate ? 'Playlist is now public' : 'Playlist is now private');
   };
 
-  // Option 7: Invite collaborators
-  const handleOpenCollab = () => {
-    setIsCollabOpen(true);
-    setIsMenuOpen(false);
-  };
-
-  // Option 8: Exclude taste profile
-  const handleToggleTaste = () => {
-    setIsTasteExcluded(prev => !prev);
-    setIsMenuOpen(false);
-    showToast(isTasteExcluded ? 'Included in taste profile' : 'Excluded from your taste profile');
-  };
-
-  // Option 9: Move to folder
-  const handleMoveToFolder = (folderName: string) => {
-    setIsMenuOpen(false);
-    setActiveSubmenu(null);
-    showToast(`Moved to folder "${folderName}"`);
-  };
-
-  // Option 10: Add to other playlist
+  // Option 6: Add to other playlist
   const handleAddToOtherPlaylist = async (targetPl: Playlist) => {
     await addTracksToPlaylist(targetPl.id, tracks);
     setIsMenuOpen(false);
@@ -394,15 +361,6 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
     }
   };
 
-  const handleCopyEmbed = () => {
-    const embedCode = `<iframe src="${window.location.origin}/?playlist=${encodeURIComponent(playlistData.id)}" width="100%" height="380" frameBorder="0" allowtransparency="true" allow="encrypted-media"></iframe>`;
-    navigator.clipboard.writeText(embedCode).then(() => {
-      showToast('Embed code copied to clipboard!');
-      setIsMenuOpen(false);
-      setActiveSubmenu(null);
-    });
-  };
-
   // Search songs to add into this playlist
   const handleSearchSongs = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -444,7 +402,7 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
       )}
 
       {/* Spotify Giant Playlist Banner */}
-      <div className="relative -mx-4 md:-mx-8 -mt-6 p-6 md:p-8 pt-10 bg-gradient-to-b from-cyan-600/25 via-indigo-950/40 to-transparent backdrop-blur-2xl border-b border-white/[0.08] flex flex-col sm:flex-row items-center sm:items-end gap-6 select-none transition duration-300">
+      <div className="relative -mx-3 sm:-mx-4 md:-mx-7 -mt-2 sm:-mt-4 p-6 md:p-8 pt-10 bg-gradient-to-b from-cyan-600/25 via-indigo-950/40 to-transparent backdrop-blur-2xl border-b border-white/[0.08] flex flex-col sm:flex-row items-center sm:items-end gap-6 select-none transition duration-300">
         <div className="relative group w-48 h-48 sm:w-56 sm:h-56 rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.6)] overflow-hidden shrink-0 bg-white/[0.05] border border-white/[0.15]">
           <img
             src={playlistData.thumbnail || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80'}
@@ -466,16 +424,6 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
             <span className="text-xs font-bold uppercase tracking-wider text-white">
               {isPrivate ? 'Private Playlist' : 'Public Playlist'}
             </span>
-            {isTasteExcluded && (
-              <span className="text-[10px] uppercase font-bold bg-white/10 text-zinc-300 px-2 py-0.5 rounded-full">
-                Excluded from Taste
-              </span>
-            )}
-            {isProfileHidden && (
-              <span className="text-[10px] uppercase font-bold bg-white/10 text-zinc-300 px-2 py-0.5 rounded-full">
-                Hidden from Profile
-              </span>
-            )}
           </div>
 
           <h1
@@ -513,12 +461,12 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
       </div>
 
       {/* Row 1: Action Controls Row (Matches Spotify Desktop Screenshot) */}
-      <div className="flex items-center gap-6 px-2 py-1 relative">
+      <div className="flex items-center gap-4 sm:gap-6 px-2 py-1 relative">
         {/* Giant Green Play Button */}
         <button
           onClick={handlePlayAll}
           disabled={tracks.length === 0}
-          className="w-14 h-14 rounded-full bg-[#1ed760] hover:bg-[#1fdf64] hover:scale-105 active:scale-95 disabled:opacity-50 text-black flex items-center justify-center shadow-xl transition"
+          className="w-14 h-14 rounded-full bg-[#1ed760] hover:bg-[#1fdf64] hover:scale-105 active:scale-95 disabled:opacity-50 text-black flex items-center justify-center shadow-xl transition shrink-0"
           title={isCurrentPlaylistPlaying ? 'Pause' : 'Play'}
         >
           {isCurrentPlaylistPlaying ? (
@@ -583,171 +531,217 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
           </button>
         )}
 
-        {/* Invite Collaborators Button */}
-        <button
-          onClick={handleOpenCollab}
-          className="text-[#b3b3b3] hover:text-white transition"
-          title="Invite collaborators"
-        >
-          <UserPlus className="w-6 h-6" />
-        </button>
-
-        {/* More Options '...' Button with Dropdown Menu */}
+        {/* More Options '...' Button with Dropdown Menu / Mobile Bottom Sheet */}
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setIsMenuOpen(prev => !prev)}
-            className={`p-1.5 rounded-full transition ${isMenuOpen ? 'text-white bg-[#282828]' : 'text-[#b3b3b3] hover:text-white hover:bg-[#282828]'}`}
+            className={`p-2 rounded-full transition active:scale-90 ${isMenuOpen ? 'text-white bg-white/15' : 'text-[#b3b3b3] hover:text-white hover:bg-white/10'}`}
             title="More options"
           >
             <MoreHorizontal className="w-6 h-6" />
           </button>
 
-          {/* Spotify Dropdown Context Menu */}
+          {/* Desktop Dropdown Menu (Hidden on mobile; positioned right-0 to stay 100% on-screen) */}
           {isMenuOpen && (
-            <div className="absolute left-0 top-full mt-2 w-72 bg-[#282828] border border-[#3e3e3e] rounded-lg shadow-2xl py-1.5 text-sm text-[#eaeaea] z-50 select-none animate-scale-up font-normal">
+            <>
+              <div
+                className="hidden md:block fixed inset-0 z-40"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  setActiveSubmenu(null);
+                }}
+              />
+              <div className="hidden md:block absolute right-0 top-full mt-2 w-64 bg-[#121622]/95 backdrop-blur-3xl border border-white/[0.12] rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.6)] py-1.5 text-sm text-zinc-200 z-50 select-none animate-scale-up font-medium">
+                {/* 1. Add to queue */}
+                <button
+                  onClick={handleAddToQueue}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.08] hover:text-white transition text-left"
+                >
+                  <ListPlus className="w-4 h-4 text-zinc-400 shrink-0" />
+                  <span>Add to queue</span>
+                </button>
+
+                {/* 2. Share */}
+                <button
+                  onClick={handleOpenShareModal}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.08] hover:text-white transition text-left"
+                >
+                  <Share2 className="w-4 h-4 text-[#1ed760] shrink-0" />
+                  <span>Share playlist</span>
+                </button>
+
+                {/* 3. Edit details */}
+                <button
+                  onClick={handleOpenEdit}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.08] hover:text-white transition text-left"
+                >
+                  <Pencil className="w-4 h-4 text-zinc-400 shrink-0" />
+                  <span>Edit details</span>
+                </button>
+
+                {/* 4. Download */}
+                <button
+                  onClick={handleDownload}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.08] hover:text-white transition text-left"
+                >
+                  <ArrowDownCircle className={`w-4 h-4 shrink-0 ${isDownloaded ? 'text-[#1ed760]' : 'text-zinc-400'}`} />
+                  <span>{isDownloaded ? 'Remove download' : 'Download'}</span>
+                </button>
+
+                {/* 5. Make private / Make public */}
+                <button
+                  onClick={handleTogglePrivacy}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.08] hover:text-white transition text-left"
+                >
+                  {isPrivate ? (
+                    <Globe className="w-4 h-4 text-zinc-400 shrink-0" />
+                  ) : (
+                    <Lock className="w-4 h-4 text-zinc-400 shrink-0" />
+                  )}
+                  <span>{isPrivate ? 'Make public' : 'Make private'}</span>
+                </button>
+
+                {/* 6. Add to other playlist (Submenu opens to the LEFT via right-full) */}
+                <div
+                  className="relative"
+                  onMouseEnter={() => setActiveSubmenu('other_playlist')}
+                  onMouseLeave={() => setActiveSubmenu(null)}
+                >
+                  <button
+                    onClick={() => setActiveSubmenu(activeSubmenu === 'other_playlist' ? null : 'other_playlist')}
+                    className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/[0.08] hover:text-white transition text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Plus className="w-4 h-4 text-zinc-400 shrink-0" />
+                      <span>Add to other playlist</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-zinc-400" />
+                  </button>
+
+                  {activeSubmenu === 'other_playlist' && (
+                    <div className="absolute right-full top-0 mr-1.5 w-56 max-h-60 overflow-y-auto bg-[#121622]/95 backdrop-blur-3xl border border-white/[0.12] rounded-xl shadow-2xl py-1.5 text-sm z-50">
+                      {playlists.filter(p => p.id !== playlistData.id).length === 0 ? (
+                        <div className="px-4 py-2.5 text-xs text-zinc-400">No other playlists</div>
+                      ) : (
+                        playlists
+                          .filter(p => p.id !== playlistData.id)
+                          .map(pl => (
+                            <button
+                              key={pl.id}
+                              onClick={() => handleAddToOtherPlaylist(pl)}
+                              className="w-full px-4 py-2 text-left hover:bg-white/[0.08] truncate block text-white text-xs"
+                            >
+                              {pl.title}
+                            </button>
+                          ))
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* 7. Delete */}
+                {(playlistData.isLocal || localPlaylist) && (
+                  <button
+                    onClick={handleDeletePlaylist}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-500/10 hover:text-red-400 transition text-left text-red-400"
+                  >
+                    <MinusCircle className="w-4 h-4 text-red-400 shrink-0" />
+                    <span>Delete playlist</span>
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Mobile Bottom Action Sheet (Real Mobile App Style - Portaled to document.body, centered, zero horizontal overflow) */}
+      {isMenuOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          className="md:hidden fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex flex-col justify-end animate-fade-in select-none"
+          onClick={() => {
+            setIsMenuOpen(false);
+            setActiveSubmenu(null);
+          }}
+        >
+          <div
+            className="w-full max-h-[82vh] overflow-y-auto bg-[#0e111a]/95 backdrop-blur-3xl border-t border-white/[0.15] rounded-t-3xl shadow-[0_-16px_48px_rgba(0,0,0,0.85)] px-5 pt-3 pb-8 text-white select-none animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Grab handle */}
+            <div className="flex justify-center mb-3">
+              <div className="w-10 h-1.5 rounded-full bg-white/25" />
+            </div>
+
+            {/* Playlist Header */}
+            <div className="flex items-center gap-3.5 pb-3.5 mb-2 border-b border-white/[0.08]">
+              <img
+                src={playlistData.thumbnail || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80'}
+                alt={playlistData.title}
+                className="w-12 h-12 rounded-xl object-cover shadow-md border border-white/10 shrink-0"
+              />
+              <div className="min-w-0 flex-1">
+                <h3 className="text-base font-bold text-white truncate">{playlistData.title}</h3>
+                <p className="text-xs text-zinc-400 font-medium truncate mt-0.5">
+                  {playlistData.author || user?.username || 'Tides Creator'} &bull; {tracks.length} songs
+                </p>
+              </div>
+            </div>
+
+            {/* Action Items List */}
+            <div className="space-y-0.5 pt-1">
               {/* 1. Add to queue */}
               <button
                 onClick={handleAddToQueue}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#3e3e3e] hover:text-white transition text-left"
+                className="w-full flex items-center gap-3.5 px-3 py-3 rounded-2xl hover:bg-white/[0.08] active:bg-white/[0.15] text-left transition text-sm font-semibold text-zinc-200 hover:text-white"
               >
-                <ListPlus className="w-4 h-4 text-zinc-400 shrink-0" />
+                <ListPlus className="w-5 h-5 text-zinc-400 shrink-0" />
                 <span>Add to queue</span>
               </button>
 
-              {/* 2. Remove from profile / Add to profile */}
+              {/* 2. Share */}
               <button
-                onClick={handleToggleProfile}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#3e3e3e] hover:text-white transition text-left"
+                onClick={handleOpenShareModal}
+                className="w-full flex items-center gap-3.5 px-3 py-3 rounded-2xl hover:bg-white/[0.08] active:bg-white/[0.15] text-left transition text-sm font-semibold text-zinc-200 hover:text-white"
               >
-                <User className="w-4 h-4 text-zinc-400 shrink-0" />
-                <span>{isProfileHidden ? 'Add to profile' : 'Remove from profile'}</span>
+                <Share2 className="w-5 h-5 text-[#1ed760] shrink-0" />
+                <span>Share playlist</span>
               </button>
 
               {/* 3. Edit details */}
               <button
                 onClick={handleOpenEdit}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#3e3e3e] hover:text-white transition text-left"
+                className="w-full flex items-center gap-3.5 px-3 py-3 rounded-2xl hover:bg-white/[0.08] active:bg-white/[0.15] text-left transition text-sm font-semibold text-zinc-200 hover:text-white"
               >
-                <Pencil className="w-4 h-4 text-zinc-400 shrink-0" />
+                <Pencil className="w-5 h-5 text-zinc-400 shrink-0" />
                 <span>Edit details</span>
               </button>
 
-              {/* 4. Delete */}
-              <button
-                onClick={handleDeletePlaylist}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#3e3e3e] hover:text-red-400 transition text-left"
-              >
-                <MinusCircle className="w-4 h-4 text-zinc-400 shrink-0" />
-                <span>Delete</span>
-              </button>
-
-              {/* 5. Download */}
+              {/* 4. Download */}
               <button
                 onClick={handleDownload}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#3e3e3e] hover:text-white transition text-left"
+                className="w-full flex items-center gap-3.5 px-3 py-3 rounded-2xl hover:bg-white/[0.08] active:bg-white/[0.15] text-left transition text-sm font-semibold text-zinc-200 hover:text-white"
               >
-                <ArrowDownCircle className={`w-4 h-4 shrink-0 ${isDownloaded ? 'text-[#1ed760]' : 'text-zinc-400'}`} />
-                <span>{isDownloaded ? 'Remove download' : 'Download'}</span>
+                <ArrowDownCircle className={`w-5 h-5 shrink-0 ${isDownloaded ? 'text-[#1ed760]' : 'text-zinc-400'}`} />
+                <span>{isDownloaded ? 'Remove download' : 'Download playlist'}</span>
               </button>
 
-              {/* 6. Make private / Make public */}
-              <button
-                onClick={handleTogglePrivacy}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#3e3e3e] hover:text-white transition text-left"
-              >
-                {isPrivate ? (
-                  <Globe className="w-4 h-4 text-zinc-400 shrink-0" />
-                ) : (
-                  <Lock className="w-4 h-4 text-zinc-400 shrink-0" />
-                )}
-                <span>{isPrivate ? 'Make public' : 'Make private'}</span>
-              </button>
-
-              {/* 7. Invite collaborators */}
-              <button
-                onClick={handleOpenCollab}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#3e3e3e] hover:text-white transition text-left"
-              >
-                <UserPlus className="w-4 h-4 text-zinc-400 shrink-0" />
-                <span>Invite collaborators</span>
-              </button>
-
-              {/* 8. Exclude from taste profile */}
-              <button
-                onClick={handleToggleTaste}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#3e3e3e] hover:text-white transition text-left border-b border-[#383838]"
-              >
-                <XCircle className="w-4 h-4 text-zinc-400 shrink-0" />
-                <span>{isTasteExcluded ? 'Include in taste profile' : 'Exclude from your taste profile'}</span>
-              </button>
-
-              {/* 9. Move to folder (Submenu) */}
-              <div
-                className="relative"
-                onMouseEnter={() => setActiveSubmenu('folder')}
-              >
-                <button
-                  onClick={() => setActiveSubmenu(activeSubmenu === 'folder' ? null : 'folder')}
-                  className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#3e3e3e] hover:text-white transition text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <Folder className="w-4 h-4 text-zinc-400 shrink-0" />
-                    <span>Move to folder</span>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-zinc-400" />
-                </button>
-
-                {activeSubmenu === 'folder' && (
-                  <div className="absolute left-full top-0 ml-1 w-52 bg-[#282828] border border-[#3e3e3e] rounded-lg shadow-2xl py-1.5 text-sm z-50">
-                    <button
-                      onClick={() => handleMoveToFolder('New Folder')}
-                      className="w-full px-4 py-2 text-left hover:bg-[#3e3e3e] flex items-center gap-2"
-                    >
-                      <Plus className="w-3.5 h-3.5 text-zinc-400" />
-                      <span>New folder</span>
-                    </button>
-                    <button
-                      onClick={() => handleMoveToFolder('Favorites')}
-                      className="w-full px-4 py-2 text-left hover:bg-[#3e3e3e]"
-                    >
-                      Favorites
-                    </button>
-                    <button
-                      onClick={() => handleMoveToFolder('Chill Mixes')}
-                      className="w-full px-4 py-2 text-left hover:bg-[#3e3e3e]"
-                    >
-                      Chill Mixes
-                    </button>
-                    <button
-                      onClick={() => handleMoveToFolder('Workout Energy')}
-                      className="w-full px-4 py-2 text-left hover:bg-[#3e3e3e]"
-                    >
-                      Workout Energy
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* 10. Add to other playlist (Submenu) */}
-              <div
-                className="relative"
-                onMouseEnter={() => setActiveSubmenu('other_playlist')}
-              >
+              {/* 5. Add to other playlist (Expandable accordion) */}
+              <div>
                 <button
                   onClick={() => setActiveSubmenu(activeSubmenu === 'other_playlist' ? null : 'other_playlist')}
-                  className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#3e3e3e] hover:text-white transition text-left"
+                  className="w-full flex items-center justify-between px-3 py-3 rounded-2xl hover:bg-white/[0.08] active:bg-white/[0.15] text-left transition text-sm font-semibold text-zinc-200 hover:text-white"
                 >
-                  <div className="flex items-center gap-3">
-                    <Plus className="w-4 h-4 text-zinc-400 shrink-0" />
+                  <div className="flex items-center gap-3.5">
+                    <Plus className="w-5 h-5 text-zinc-400 shrink-0" />
                     <span>Add to other playlist</span>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-zinc-400" />
+                  <ChevronRight className={`w-4 h-4 text-zinc-400 transition-transform duration-200 ${activeSubmenu === 'other_playlist' ? 'rotate-90' : ''}`} />
                 </button>
-
                 {activeSubmenu === 'other_playlist' && (
-                  <div className="absolute left-full top-0 ml-1 w-56 max-h-60 overflow-y-auto bg-[#282828] border border-[#3e3e3e] rounded-lg shadow-2xl py-1.5 text-sm z-50">
+                  <div className="pl-6 pr-2 py-1 space-y-1 bg-white/[0.03] rounded-2xl border border-white/[0.06] mb-1">
                     {playlists.filter(p => p.id !== playlistData.id).length === 0 ? (
-                      <div className="px-4 py-2.5 text-xs text-zinc-400">No other playlists</div>
+                      <p className="px-3 py-2 text-xs text-zinc-400">No other playlists available</p>
                     ) : (
                       playlists
                         .filter(p => p.id !== playlistData.id)
@@ -755,9 +749,9 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
                           <button
                             key={pl.id}
                             onClick={() => handleAddToOtherPlaylist(pl)}
-                            className="w-full px-4 py-2 text-left hover:bg-[#3e3e3e] truncate block text-white"
+                            className="w-full px-3 py-2.5 text-left hover:bg-white/[0.08] rounded-xl text-xs text-zinc-300 hover:text-white truncate block active:scale-98"
                           >
-                            {pl.title}
+                            + {pl.title}
                           </button>
                         ))
                     )}
@@ -765,52 +759,45 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
                 )}
               </div>
 
-              {/* 11. Share (Submenu) */}
-              <div
-                className="relative"
-                onMouseEnter={() => setActiveSubmenu('share')}
+              {/* 6. Make public / Make private */}
+              <button
+                onClick={handleTogglePrivacy}
+                className="w-full flex items-center gap-3.5 px-3 py-3 rounded-2xl hover:bg-white/[0.08] active:bg-white/[0.15] text-left transition text-sm font-semibold text-zinc-200 hover:text-white"
               >
-                <button
-                  onClick={() => setActiveSubmenu(activeSubmenu === 'share' ? null : 'share')}
-                  className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#3e3e3e] hover:text-white transition text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <Share2 className="w-4 h-4 text-zinc-400 shrink-0" />
-                    <span>Share</span>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-zinc-400" />
-                </button>
-
-                {activeSubmenu === 'share' && (
-                  <div className="absolute left-full top-0 ml-1 w-52 bg-[#282828] border border-[#3e3e3e] rounded-lg shadow-2xl py-1.5 text-sm z-50">
-                    <button
-                      onClick={handleOpenShareModal}
-                      className="w-full px-4 py-2 text-left hover:bg-[#3e3e3e] flex items-center gap-2"
-                    >
-                      <Share2 className="w-3.5 h-3.5 text-[#1ed760]" />
-                      <span>Share options...</span>
-                    </button>
-                    <button
-                      onClick={handleCopyLink}
-                      className="w-full px-4 py-2 text-left hover:bg-[#3e3e3e] flex items-center gap-2"
-                    >
-                      <Copy className="w-3.5 h-3.5 text-zinc-400" />
-                      <span>Copy link to playlist</span>
-                    </button>
-                    <button
-                      onClick={handleCopyEmbed}
-                      className="w-full px-4 py-2 text-left hover:bg-[#3e3e3e] flex items-center gap-2"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5 text-zinc-400" />
-                      <span>Copy embed code</span>
-                    </button>
-                  </div>
+                {isPrivate ? (
+                  <Globe className="w-5 h-5 text-zinc-400 shrink-0" />
+                ) : (
+                  <Lock className="w-5 h-5 text-zinc-400 shrink-0" />
                 )}
-              </div>
+                <span>{isPrivate ? 'Make public' : 'Make private'}</span>
+              </button>
+
+              {/* 7. Delete (if local) */}
+              {(playlistData.isLocal || localPlaylist) && (
+                <button
+                  onClick={handleDeletePlaylist}
+                  className="w-full flex items-center gap-3.5 px-3 py-3 rounded-2xl hover:bg-red-500/10 active:bg-red-500/20 text-left transition text-sm font-semibold text-red-400 hover:text-red-300"
+                >
+                  <MinusCircle className="w-5 h-5 text-red-400 shrink-0" />
+                  <span>Delete playlist</span>
+                </button>
+              )}
             </div>
-          )}
-        </div>
-      </div>
+
+            {/* Cancel Button */}
+            <button
+              onClick={() => {
+                setIsMenuOpen(false);
+                setActiveSubmenu(null);
+              }}
+              className="w-full mt-4 py-3 rounded-2xl bg-white/[0.06] hover:bg-white/[0.12] active:scale-98 font-bold text-sm text-zinc-300 hover:text-white transition text-center border border-white/[0.08]"
+            >
+              Close
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Row 2: Pills Row (+ Add, ✎ Name & details, and Custom Order Dropdown) */}
       <div className="flex items-center justify-between px-2 pt-1 border-b border-[#282828]/60 pb-3">
@@ -934,15 +921,21 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
         )}
       </div>
 
-      {/* MODAL 1: Edit Details Modal (Spotify Desktop Layout) */}
-      {isEditOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="relative w-full max-w-lg bg-[#282828] border border-[#3e3e3e] rounded-xl p-6 shadow-2xl text-white">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-xl font-bold text-white">Edit details</h3>
+      {/* MODAL 1: Edit Details Modal */}
+      {isEditOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in select-none"
+          onClick={() => setIsEditOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-[#121622]/95 backdrop-blur-2xl border border-white/15 rounded-3xl p-6 shadow-2xl text-white animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-5 border-b border-white/10 pb-3">
+              <h3 className="text-xl font-bold text-white tracking-tight">Edit details</h3>
               <button
                 onClick={() => setIsEditOpen(false)}
-                className="p-1.5 text-zinc-400 hover:text-white rounded-full hover:bg-[#383838] transition"
+                className="p-1.5 text-zinc-400 hover:text-white rounded-full hover:bg-white/10 transition"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -951,7 +944,7 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
             <form onSubmit={handleSaveEdit} className="space-y-4">
               <div className="flex flex-col sm:flex-row gap-5">
                 {/* Photo Preview / Change */}
-                <div className="relative group w-44 h-44 rounded-lg bg-[#181818] overflow-hidden shrink-0 border border-[#3e3e3e] flex items-center justify-center">
+                <div className="relative group w-40 h-40 rounded-2xl bg-black/40 overflow-hidden shrink-0 border border-white/15 flex items-center justify-center shadow-lg">
                   <img
                     src={editThumb || playlistData.thumbnail || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80'}
                     alt=""
@@ -974,7 +967,7 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
                       value={editTitle}
                       onChange={e => setEditTitle(e.target.value)}
                       required
-                      className="w-full px-3.5 py-2 bg-[#3e3e3e]/80 border border-[#555] rounded-md text-white placeholder-zinc-500 focus:outline-none focus:border-white transition text-sm"
+                      className="w-full px-3.5 py-2.5 bg-black/40 border border-white/15 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-[#1ed760] transition text-sm"
                     />
                   </div>
 
@@ -987,7 +980,7 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
                       onChange={e => setEditDesc(e.target.value)}
                       rows={3}
                       placeholder="Add an optional description"
-                      className="w-full px-3.5 py-2 bg-[#3e3e3e]/80 border border-[#555] rounded-md text-white placeholder-zinc-500 focus:outline-none focus:border-white transition resize-none text-xs"
+                      className="w-full px-3.5 py-2 bg-black/40 border border-white/15 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-[#1ed760] transition resize-none text-xs"
                     />
                   </div>
 
@@ -1000,13 +993,13 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
                       value={editThumb}
                       onChange={e => setEditThumb(e.target.value)}
                       placeholder="https://example.com/cover.jpg"
-                      className="w-full px-3.5 py-1.5 bg-[#3e3e3e]/80 border border-[#555] rounded-md text-white placeholder-zinc-500 focus:outline-none focus:border-white transition text-xs"
+                      className="w-full px-3.5 py-2 bg-black/40 border border-white/15 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-[#1ed760] transition text-xs"
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
                 <button
                   type="button"
                   onClick={() => setIsEditOpen(false)}
@@ -1017,96 +1010,40 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
                 <button
                   type="submit"
                   disabled={!editTitle.trim()}
-                  className="px-6 py-2.5 text-xs font-bold bg-white text-black hover:bg-zinc-200 hover:scale-105 active:scale-95 rounded-full transition shadow"
+                  className="px-6 py-2.5 text-xs font-bold bg-[#1ed760] text-black hover:bg-[#1fdf64] hover:scale-105 active:scale-95 rounded-full transition shadow"
                 >
-                  Save
+                  Save Changes
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* MODAL 2: Invite Collaborators Modal */}
-      {isCollabOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="relative w-full max-w-md bg-[#282828] border border-[#3e3e3e] rounded-xl p-6 shadow-2xl text-white space-y-5">
-            <div className="flex items-center justify-between">
+      {/* MODAL 2: Add Songs to Playlist Modal */}
+      {isAddSongsOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in select-none"
+          onClick={() => setIsAddSongsOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-xl max-h-[85vh] overflow-hidden bg-[#121622]/95 backdrop-blur-2xl border border-white/15 rounded-3xl p-6 shadow-2xl text-white space-y-4 flex flex-col animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between shrink-0 border-b border-white/10 pb-3">
               <div className="flex items-center gap-3">
-                <div className="p-3 bg-emerald-500/10 text-[#1ed760] rounded-xl">
-                  <UserPlus className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-white">Invite collaborators</h3>
-                  <p className="text-xs text-zinc-400">Share this playlist and build it together</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsCollabOpen(false)}
-                className="p-1.5 text-zinc-400 hover:text-white rounded-full hover:bg-[#383838] transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-zinc-300">Invite Link</label>
-              <div className="flex items-center gap-2 bg-[#181818] border border-[#3e3e3e] rounded-lg p-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={`${window.location.origin}/playlist/${playlistData.id}?collab=true`}
-                  className="w-full bg-transparent text-xs text-zinc-300 outline-none select-all"
-                />
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(`${window.location.origin}/playlist/${playlistData.id}?collab=true`);
-                    showToast('Invite link copied to clipboard!');
-                    setIsCollabOpen(false);
-                  }}
-                  className="px-3 py-1.5 bg-[#1ed760] hover:bg-[#1fdf64] text-black font-bold text-xs rounded-full transition shadow shrink-0"
-                >
-                  Copy link
-                </button>
-              </div>
-            </div>
-
-            <div className="border-t border-[#3e3e3e] pt-3">
-              <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Collaborators</h4>
-              <div className="flex items-center justify-between py-2">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-pink-500 to-purple-600 flex items-center justify-center text-xs font-bold text-white">
-                    {playlistData.author ? playlistData.author.slice(0, 1).toUpperCase() : 'Y'}
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-white">{playlistData.author || user?.username || 'You'}</p>
-                    <p className="text-[10px] text-zinc-400">Owner</p>
-                  </div>
-                </div>
-                <span className="text-[11px] text-zinc-400">Can manage</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 3: Add Songs to Playlist Modal */}
-      {isAddSongsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="relative w-full max-w-xl bg-[#222] border border-[#383838] rounded-xl p-6 shadow-2xl text-white space-y-4 max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-[#1ed760]/10 text-[#1ed760] rounded-xl">
+                <div className="p-2.5 bg-[#1ed760]/10 text-[#1ed760] rounded-xl border border-[#1ed760]/20">
                   <Plus className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">Add songs to {playlistData.title}</h3>
+                  <h3 className="text-lg font-bold text-white tracking-tight">Add songs to {playlistData.title}</h3>
                   <p className="text-xs text-zinc-400">Search for tracks and add them directly</p>
                 </div>
               </div>
               <button
                 onClick={() => setIsAddSongsOpen(false)}
-                className="p-1.5 text-zinc-400 hover:text-white rounded-full hover:bg-[#383838] transition"
+                className="p-1.5 text-zinc-400 hover:text-white rounded-full hover:bg-white/10 transition"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1115,20 +1052,20 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
             {/* Search Input */}
             <form onSubmit={handleSearchSongs} className="shrink-0 flex items-center gap-2">
               <div className="relative flex-1">
-                <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-3" />
+                <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-3.5" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   placeholder="Search for song title or artist..."
                   autoFocus
-                  className="w-full pl-9 pr-4 py-2.5 bg-[#181818] border border-[#3e3e3e] rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-[#1ed760] text-sm"
+                  className="w-full pl-9 pr-4 py-2.5 bg-black/40 border border-white/15 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-[#1ed760] text-sm"
                 />
               </div>
               <button
                 type="submit"
                 disabled={!searchQuery.trim() || isSearching}
-                className="px-5 py-2.5 bg-[#1ed760] hover:bg-[#1fdf64] disabled:opacity-50 text-black font-bold text-xs rounded-lg transition"
+                className="px-5 py-2.5 bg-[#1ed760] hover:bg-[#1fdf64] disabled:opacity-50 text-black font-bold text-xs rounded-xl transition"
               >
                 {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
               </button>
@@ -1146,10 +1083,10 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
                   return (
                     <div
                       key={track.id}
-                      className="flex items-center justify-between p-2 rounded-lg hover:bg-[#2e2e2e] transition"
+                      className="flex items-center justify-between p-2.5 rounded-2xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] transition"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <img src={track.thumbnail} alt="" className="w-10 h-10 rounded object-cover shrink-0" />
+                        <img src={track.thumbnail} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
                         <div className="truncate">
                           <p className="text-xs font-semibold text-white truncate">{track.title}</p>
                           <p className="text-[11px] text-zinc-400 truncate">{track.artist}</p>
@@ -1158,9 +1095,9 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
                       <button
                         onClick={() => handleAddTrackDirect(track)}
                         disabled={alreadyAdded}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-full transition shrink-0 ml-3 ${
+                        className={`px-3.5 py-1.5 text-xs font-bold rounded-full transition shrink-0 ml-3 ${
                           alreadyAdded
-                            ? 'bg-zinc-700 text-zinc-400 cursor-default'
+                            ? 'bg-zinc-700/50 text-zinc-400 cursor-default'
                             : 'bg-white hover:bg-zinc-200 text-black hover:scale-105 active:scale-95'
                         }`}
                       >
@@ -1172,13 +1109,20 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Modern Glassmorphic Share Playlist Modal */}
-      {isShareModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in select-none">
-          <div className="relative w-full max-w-md bg-[#0f121d]/90 backdrop-blur-2xl border border-white/15 rounded-3xl shadow-[0_24px_64px_rgba(0,0,0,0.8)] p-6 text-white space-y-5 animate-scale-up">
+      {isShareModalOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in select-none"
+          onClick={() => setIsShareModalOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-md max-h-[90vh] overflow-y-auto bg-[#0f121d]/95 backdrop-blur-2xl border border-white/15 rounded-3xl shadow-[0_24px_64px_rgba(0,0,0,0.8)] p-6 text-white space-y-5 animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Top Specular Line */}
             <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/25 to-transparent rounded-t-3xl pointer-events-none" />
 
@@ -1300,7 +1244,8 @@ export const PlaylistView: React.FC<PlaylistViewProps> = ({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
