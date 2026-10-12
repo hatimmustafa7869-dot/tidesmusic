@@ -44,6 +44,7 @@ public class MediaPlaybackService extends Service {
     private String currentCoverUrl = "";
     private Bitmap currentCoverBitmap = null;
     private boolean isPlaying = false;
+    private boolean isForegroundServiceStarted = false;
 
     @Override
     public void onCreate() {
@@ -57,8 +58,21 @@ public class MediaPlaybackService extends Service {
             wakeLock.setReferenceCounted(false);
         }
 
-        // Initialize MediaSessionCompat
+        // Initialize MediaSessionCompat with device media button support
         mediaSession = new MediaSessionCompat(this, "TidesMusicMediaSession");
+        mediaSession.setFlags(
+                MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS |
+                MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
+        );
+
+        Intent mediaButtonIntent = new Intent(Intent.ACTION_MEDIA_BUTTON);
+        mediaButtonIntent.setClass(this, MediaNotificationReceiver.class);
+        PendingIntent mbrPendingIntent = PendingIntent.getBroadcast(
+                this, 0, mediaButtonIntent,
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0
+        );
+        mediaSession.setMediaButtonReceiver(mbrPendingIntent);
+
         mediaSession.setCallback(new MediaSessionCompat.Callback() {
             @Override
             public void onPlay() {
@@ -87,12 +101,22 @@ public class MediaPlaybackService extends Service {
                 sendControlBroadcast("pause");
                 stopSelf();
             }
+
+            @Override
+            public void onSeekTo(long pos) {
+                Intent intent = new Intent(MediaNotificationReceiver.BROADCAST_WEB_CONTROL);
+                intent.setPackage(getPackageName());
+                intent.putExtra(MediaNotificationReceiver.EXTRA_ACTION, "seek");
+                intent.putExtra("seek_position", pos / 1000.0);
+                sendBroadcast(intent);
+            }
         });
         mediaSession.setActive(true);
     }
 
     private void sendControlBroadcast(String action) {
         Intent intent = new Intent(MediaNotificationReceiver.BROADCAST_WEB_CONTROL);
+        intent.setPackage(getPackageName());
         intent.putExtra(MediaNotificationReceiver.EXTRA_ACTION, action);
         sendBroadcast(intent);
     }
@@ -105,6 +129,7 @@ public class MediaPlaybackService extends Service {
         if (ACTION_STOP.equals(action)) {
             releaseWakeLock();
             stopForeground(true);
+            isForegroundServiceStarted = false;
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -182,8 +207,10 @@ public class MediaPlaybackService extends Service {
         // Update MediaSession
         PlaybackStateCompat.Builder stateBuilder = new PlaybackStateCompat.Builder()
                 .setActions(PlaybackStateCompat.ACTION_PLAY | PlaybackStateCompat.ACTION_PAUSE |
+                        PlaybackStateCompat.ACTION_PLAY_PAUSE |
                         PlaybackStateCompat.ACTION_SKIP_TO_NEXT | PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS |
-                        PlaybackStateCompat.ACTION_STOP)
+                        PlaybackStateCompat.ACTION_STOP |
+                        PlaybackStateCompat.ACTION_SEEK_TO)
                 .setState(isPlaying ? PlaybackStateCompat.STATE_PLAYING : PlaybackStateCompat.STATE_PAUSED,
                         PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1.0f);
         mediaSession.setPlaybackState(stateBuilder.build());
@@ -246,14 +273,25 @@ public class MediaPlaybackService extends Service {
         Notification notification = builder.build();
 
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+            if (!isForegroundServiceStarted) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+                } else {
+                    startForeground(NOTIFICATION_ID, notification);
+                }
+                isForegroundServiceStarted = true;
             } else {
-                startForeground(NOTIFICATION_ID, notification);
+                NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                if (manager != null) {
+                    manager.notify(NOTIFICATION_ID, notification);
+                }
             }
         } catch (Exception e) {
             try {
-                startForeground(NOTIFICATION_ID, notification);
+                NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                if (manager != null) {
+                    manager.notify(NOTIFICATION_ID, notification);
+                }
             } catch (Exception ignored) {}
         }
     }
@@ -289,6 +327,7 @@ public class MediaPlaybackService extends Service {
     @Override
     public void onDestroy() {
         releaseWakeLock();
+        isForegroundServiceStarted = false;
         if (mediaSession != null) {
             mediaSession.setActive(false);
             mediaSession.release();
@@ -302,35 +341,47 @@ public class MediaPlaybackService extends Service {
     }
 
     public static void startWithTrack(Context context, String title, String artist, String coverUrl, boolean isPlaying) {
-        Intent intent = new Intent(context, MediaPlaybackService.class);
-        intent.setAction(ACTION_START_OR_UPDATE);
-        intent.putExtra(EXTRA_TITLE, title);
-        intent.putExtra(EXTRA_ARTIST, artist);
-        intent.putExtra(EXTRA_COVER_URL, coverUrl);
-        intent.putExtra(EXTRA_IS_PLAYING, isPlaying);
+        try {
+            Intent intent = new Intent(context, MediaPlaybackService.class);
+            intent.setAction(ACTION_START_OR_UPDATE);
+            intent.putExtra(EXTRA_TITLE, title);
+            intent.putExtra(EXTRA_ARTIST, artist);
+            intent.putExtra(EXTRA_COVER_URL, coverUrl);
+            intent.putExtra(EXTRA_IS_PLAYING, isPlaying);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent);
-        } else {
-            context.startService(intent);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent);
+            } else {
+                context.startService(intent);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
     public static void updateState(Context context, boolean isPlaying) {
-        Intent intent = new Intent(context, MediaPlaybackService.class);
-        intent.setAction(ACTION_UPDATE_STATE);
-        intent.putExtra(EXTRA_IS_PLAYING, isPlaying);
+        try {
+            Intent intent = new Intent(context, MediaPlaybackService.class);
+            intent.setAction(ACTION_UPDATE_STATE);
+            intent.putExtra(EXTRA_IS_PLAYING, isPlaying);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent);
-        } else {
-            context.startService(intent);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent);
+            } else {
+                context.startService(intent);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
     public static void stopService(Context context) {
-        Intent intent = new Intent(context, MediaPlaybackService.class);
-        intent.setAction(ACTION_STOP);
-        context.startService(intent);
+        try {
+            Intent intent = new Intent(context, MediaPlaybackService.class);
+            intent.setAction(ACTION_STOP);
+            context.startService(intent);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

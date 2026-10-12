@@ -56,6 +56,20 @@ function extractCleanVideoId(id: string): string {
   return id;
 }
 
+const SILENT_AUDIO_URI = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+
+function getAbsoluteArtworkUrl(url?: string): string {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
+  }
+  try {
+    return new URL(url, window.location.origin).href;
+  } catch {
+    return url;
+  }
+}
+
 export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { addToHistory } = useLibrary();
 
@@ -146,6 +160,24 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   currentTimeRef.current = currentTime;
   durationRef.current = duration;
   isPlayingRef.current = isPlaying;
+
+  const lastMediaSessionUpdateRef = useRef<number>(0);
+  const updateMediaSessionPosition = (pos: number, dur: number) => {
+    if (!('mediaSession' in navigator) || !('setPositionState' in navigator.mediaSession)) return;
+    const now = Date.now();
+    if (now - lastMediaSessionUpdateRef.current < 750) return;
+    lastMediaSessionUpdateRef.current = now;
+
+    if (Number.isFinite(dur) && dur > 0 && Number.isFinite(pos) && pos >= 0) {
+      try {
+        navigator.mediaSession.setPositionState({
+          duration: dur,
+          playbackRate: 1,
+          position: Math.min(pos, dur)
+        });
+      } catch (e) {}
+    }
+  };
 
   // Initialize YouTube IFrame Player API
   useEffect(() => {
@@ -283,15 +315,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           clearTimeout(stallTimeoutRef.current);
           stallTimeoutRef.current = null;
         }
-        if ('mediaSession' in navigator && !isNaN(audio.duration) && audio.duration > 0) {
-          try {
-            navigator.mediaSession.setPositionState({
-              duration: audio.duration,
-              playbackRate: audio.playbackRate || 1,
-              position: Math.min(audio.currentTime, audio.duration),
-            });
-          } catch {}
-        }
+        updateMediaSessionPosition(audio.currentTime, audio.duration);
       }
     };
 
@@ -422,14 +446,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const d = ytPlayerRef.current.getDuration();
           if (typeof t === 'number' && !isNaN(t)) {
             setCurrentTime(t);
-            if ('mediaSession' in navigator && typeof d === 'number' && d > 0) {
-              try {
-                navigator.mediaSession.setPositionState({
-                  duration: d,
-                  playbackRate: 1,
-                  position: Math.min(t, d)
-                });
-              } catch {}
+            if (typeof d === 'number' && d > 0) {
+              updateMediaSessionPosition(t, d);
             }
           }
           if (typeof d === 'number' && d > 0) {
@@ -528,18 +546,19 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!currentTrack || !('mediaSession' in navigator)) return;
 
     try {
+      const artworkUrl = getAbsoluteArtworkUrl(currentTrack.thumbnail);
       navigator.mediaSession.metadata = new MediaMetadata({
         title: currentTrack.title,
         artist: currentTrack.artist || 'Unknown Artist',
         album: 'Tides Music',
-        artwork: [
-          { src: currentTrack.thumbnail, sizes: '96x96', type: 'image/jpeg' },
-          { src: currentTrack.thumbnail, sizes: '128x128', type: 'image/jpeg' },
-          { src: currentTrack.thumbnail, sizes: '192x192', type: 'image/jpeg' },
-          { src: currentTrack.thumbnail, sizes: '256x256', type: 'image/jpeg' },
-          { src: currentTrack.thumbnail, sizes: '384x384', type: 'image/jpeg' },
-          { src: currentTrack.thumbnail, sizes: '512x512', type: 'image/jpeg' },
-        ],
+        artwork: artworkUrl ? [
+          { src: artworkUrl, sizes: '96x96', type: 'image/jpeg' },
+          { src: artworkUrl, sizes: '128x128', type: 'image/jpeg' },
+          { src: artworkUrl, sizes: '192x192', type: 'image/jpeg' },
+          { src: artworkUrl, sizes: '256x256', type: 'image/jpeg' },
+          { src: artworkUrl, sizes: '384x384', type: 'image/jpeg' },
+          { src: artworkUrl, sizes: '512x512', type: 'image/jpeg' },
+        ] : [],
       });
     } catch (e) {
       console.warn('MediaSession metadata update error:', e);
@@ -606,21 +625,29 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   // 5. Synchronize Android Native App Foreground Service Bridge
+  const lastReportedTrackIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     const androidBridge = (window as any).AndroidBridge;
-    if (androidBridge && currentTrack) {
-      try {
+    if (!androidBridge || !currentTrack) return;
+
+    try {
+      const coverUrl = getAbsoluteArtworkUrl(currentTrack.thumbnail);
+      if (lastReportedTrackIdRef.current !== currentTrack.id) {
+        lastReportedTrackIdRef.current = currentTrack.id;
         androidBridge.onTrackChange(
           currentTrack.title,
           currentTrack.artist || 'Unknown Artist',
-          currentTrack.thumbnail || '',
+          coverUrl,
           isPlaying
         );
-      } catch (err) {
-        console.warn('AndroidBridge track update error:', err);
+      } else {
+        androidBridge.onPlaybackStateChange(isPlaying);
       }
+    } catch (err) {
+      console.warn('AndroidBridge track update error:', err);
     }
-  }, [currentTrack, isPlaying]);
+  }, [currentTrack?.id, currentTrack?.title, currentTrack?.artist, currentTrack?.thumbnail, isPlaying]);
 
   // 6. Expose global controls for Android Native Bridge & External Events
   useEffect(() => {
@@ -632,6 +659,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (isPlayingRef.current) togglePlayRef.current();
       },
       togglePlay: () => togglePlayRef.current(),
+      toggle: () => togglePlayRef.current(),
       next: () => nextTrackRef.current(),
       prev: () => prevTrackRef.current(),
       seek: (sec: number) => seekRef.current(sec)
@@ -649,6 +677,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         nextTrackRef.current();
       } else if (action === 'prev') {
         prevTrackRef.current();
+      } else if (action === 'seek' && typeof e.detail?.seek_position === 'number') {
+        seekRef.current(e.detail.seek_position);
       }
     };
 
@@ -670,10 +700,16 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       stallTimeoutRef.current = null;
     }
 
+    // Keep an active silent audio loop playing in HTML5 Audio so mobile Chrome/Android maintains top-level Audio Focus
     if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.removeAttribute('src');
-      audioRef.current.load();
+      try {
+        if (!audioRef.current.src || !audioRef.current.src.startsWith('data:audio/wav')) {
+          audioRef.current.src = SILENT_AUDIO_URI;
+          audioRef.current.loop = true;
+          audioRef.current.volume = 0.001;
+        }
+        audioRef.current.play().catch(() => {});
+      } catch {}
     }
 
     let targetVideoId = track.id;
@@ -748,6 +784,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // Try HTML5 audio stream with automatic 2.2s timeout fallback
     activeEngineRef.current = 'audio';
+    audio.loop = false;
+    audio.volume = isMuted ? 0 : volume;
     const streamUrl = api.getStreamUrl(activeTrack.id);
     audio.src = streamUrl;
     audio.load();
@@ -916,8 +954,20 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     userExplicitPauseRef.current = isPlaying;
 
     if (activeEngineRef.current === 'yt' && ytPlayerRef.current) {
-      if (isPlaying) ytPlayerRef.current.pauseVideo();
-      else ytPlayerRef.current.playVideo();
+      if (isPlaying) {
+        ytPlayerRef.current.pauseVideo();
+        if (audioRef.current) audioRef.current.pause();
+      } else {
+        ytPlayerRef.current.playVideo();
+        if (audioRef.current) {
+          if (!audioRef.current.src || !audioRef.current.src.startsWith('data:audio/wav')) {
+            audioRef.current.src = SILENT_AUDIO_URI;
+            audioRef.current.loop = true;
+            audioRef.current.volume = 0.001;
+          }
+          audioRef.current.play().catch(() => {});
+        }
+      }
       setIsPlaying(nextPlay);
     } else if (audioRef.current) {
       if (isPlaying) {

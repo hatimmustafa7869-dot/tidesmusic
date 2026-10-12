@@ -179,7 +179,8 @@ public class MainActivity extends AppCompatActivity {
             public void onReceive(Context context, Intent intent) {
                 if (intent != null && intent.hasExtra(MediaNotificationReceiver.EXTRA_ACTION)) {
                     String action = intent.getStringExtra(MediaNotificationReceiver.EXTRA_ACTION);
-                    executeControlScript(action);
+                    double seekPos = intent.getDoubleExtra("seek_position", -1.0);
+                    executeControlScript(action, seekPos);
                 }
             }
         };
@@ -192,16 +193,28 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void executeControlScript(String action) {
+    private void executeControlScript(String action, double seekPos) {
         if (webView == null) return;
-        String js = String.format(
+        String js;
+        if ("seek".equals(action) && seekPos >= 0) {
+            js = String.format(java.util.Locale.US,
+                "if (window.AndroidControls && typeof window.AndroidControls.seek === 'function') {" +
+                "  window.AndroidControls.seek(%f);" +
+                "}",
+                seekPos
+            );
+        } else {
+            js = String.format(
                 "if (window.AndroidControls && typeof window.AndroidControls['%s'] === 'function') {" +
                 "  window.AndroidControls['%s']();" +
+                "} else if (window.AndroidControls && '%s' === 'toggle' && typeof window.AndroidControls.togglePlay === 'function') {" +
+                "  window.AndroidControls.togglePlay();" +
                 "} else {" +
                 "  window.dispatchEvent(new CustomEvent('nativeMediaControl', { detail: { action: '%s' } }));" +
                 "}",
-                action, action, action
-        );
+                action, action, action, action
+            );
+        }
         webView.evaluateJavascript(js, null);
     }
 

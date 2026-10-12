@@ -41,11 +41,12 @@
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 
-        <!-- Notification Receiver for media controls -->
+        <!-- Notification & System Media Button Receiver for device media controls -->
         <receiver
             android:name=".MediaNotificationReceiver"
-            android:exported="false">
+            android:exported="true">
             <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
                 <action android:name="com.tidesmusic.app.ACTION_PLAY" />
                 <action android:name="com.tidesmusic.app.ACTION_PAUSE" />
                 <action android:name="com.tidesmusic.app.ACTION_NEXT" />
