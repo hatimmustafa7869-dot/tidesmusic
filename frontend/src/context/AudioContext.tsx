@@ -212,9 +212,25 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 setIsLoading(true);
               }
             },
-            onError: (err: any) => {
+            onError: async (err: any) => {
               console.warn('YouTube Player Error:', err);
               setIsLoading(false);
+              const errCode = err?.data;
+              // Error 100: not found, 101/150: embed restricted by copyright holder
+              if ((errCode === 101 || errCode === 150 || errCode === 100) && currentTrackRef.current) {
+                const track = currentTrackRef.current;
+                console.log(`Video ID ${track.id} restricted (${errCode}), auto-searching playable alternate for:`, track.title);
+                try {
+                  const searchRes = await api.search(`${track.title} ${track.artist} audio`, 'songs');
+                  const altTrack = (searchRes.results || []).find((t: any) => t.id && t.id !== track.id);
+                  if (altTrack && altTrack.id) {
+                    track.id = altTrack.id;
+                    playWithYouTube(track, 0);
+                  }
+                } catch (searchErr) {
+                  console.warn('Alternate track search failed:', searchErr);
+                }
+              }
             }
           }
         });
@@ -249,7 +265,10 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (activeEngineRef.current === 'audio') {
         setIsLoading(false);
         setIsPlaying(true);
-        if (stallTimeoutRef.current) clearTimeout(stallTimeoutRef.current);
+        if (audio.currentTime > 0.2 && stallTimeoutRef.current) {
+          clearTimeout(stallTimeoutRef.current);
+          stallTimeoutRef.current = null;
+        }
       }
     };
     const handleCanPlay = () => {
@@ -259,6 +278,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const handleTimeUpdate = () => {
       if (activeEngineRef.current === 'audio' && audio) {
         setCurrentTime(audio.currentTime);
+        // Clear stall watchdog as soon as audio has actually started flowing
+        if (audio.currentTime > 0.2 && stallTimeoutRef.current) {
+          clearTimeout(stallTimeoutRef.current);
+          stallTimeoutRef.current = null;
+        }
         if ('mediaSession' in navigator && !isNaN(audio.duration) && audio.duration > 0) {
           try {
             navigator.mediaSession.setPositionState({
@@ -274,6 +298,15 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const handleLoadedMetadata = () => {
       if (activeEngineRef.current === 'audio' && audio) {
         setDuration(audio.duration || 0);
+      }
+    };
+
+    const handleStalled = () => {
+      if (activeEngineRef.current === 'audio' && audio.currentTime === 0 && !userExplicitPauseRef.current && hasUserStartedPlaybackRef.current) {
+        console.warn('Audio stream stalled at 0s, fast-falling back to YouTube audio engine');
+        if (currentTrackRef.current) {
+          playWithYouTube(currentTrackRef.current);
+        }
       }
     };
 
@@ -297,6 +330,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     audio.addEventListener('canplay', handleCanPlay);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('stalled', handleStalled);
+    audio.addEventListener('suspend', handleStalled);
     audio.addEventListener('error', handleError);
 
     return () => {
@@ -307,6 +342,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       audio.removeEventListener('canplay', handleCanPlay);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('stalled', handleStalled);
+      audio.removeEventListener('suspend', handleStalled);
       audio.removeEventListener('error', handleError);
       audio.pause();
     };
@@ -622,13 +659,16 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   // Playback execution via YouTube Engine
-  const playWithYouTube = (track: Track, startTime: number = 0) => {
+  const playWithYouTube = async (track: Track, startTime: number = 0) => {
     hasUserStartedPlaybackRef.current = true;
     userExplicitPauseRef.current = false;
     activeEngineRef.current = 'yt';
     useYtEngineRef.current = true;
 
-    if (stallTimeoutRef.current) clearTimeout(stallTimeoutRef.current);
+    if (stallTimeoutRef.current) {
+      clearTimeout(stallTimeoutRef.current);
+      stallTimeoutRef.current = null;
+    }
 
     if (audioRef.current) {
       audioRef.current.pause();
@@ -636,7 +676,18 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       audioRef.current.load();
     }
 
-    const cleanId = extractCleanVideoId(track.id);
+    let targetVideoId = track.id;
+    if (!/^[a-zA-Z0-9_-]{11}$/.test(targetVideoId)) {
+      try {
+        const resolved = await api.resolveTrackId(track);
+        if (resolved && /^[a-zA-Z0-9_-]{11}$/.test(resolved)) {
+          targetVideoId = resolved;
+          track.id = resolved;
+        }
+      } catch {}
+    }
+
+    const cleanId = extractCleanVideoId(targetVideoId);
 
     const attemptPlay = () => {
       const player = ytPlayerRef.current;
@@ -654,7 +705,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           console.warn('ytPlayer play attempt failed:', e);
         }
       } else {
-        setTimeout(attemptPlay, 250);
+        setTimeout(attemptPlay, 200);
       }
     };
 
@@ -662,7 +713,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // Load and play a specific track
-  const loadAndPlayTrack = (track: Track) => {
+  const loadAndPlayTrack = async (track: Track) => {
     hasUserStartedPlaybackRef.current = true;
     userExplicitPauseRef.current = false;
     const audio = audioRef.current;
@@ -675,15 +726,29 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     addToHistory(track);
 
-    // If YouTube engine was already chosen (e.g. Hostinger environment where stream failed), play directly
+    let activeTrack = track;
+    // Pre-resolve synthetic track id if needed
+    if (!/^[a-zA-Z0-9_-]{11}$/.test(track.id)) {
+      try {
+        const resolvedId = await api.resolveTrackId(track);
+        if (resolvedId && /^[a-zA-Z0-9_-]{11}$/.test(resolvedId)) {
+          activeTrack = { ...track, id: resolvedId };
+          setCurrentTrack(activeTrack);
+        }
+      } catch (err) {
+        console.warn('Track pre-resolve warning:', err);
+      }
+    }
+
+    // If YouTube engine was already chosen (e.g. host blocks direct audio streams), play directly
     if (useYtEngineRef.current) {
-      playWithYouTube(track, 0);
+      playWithYouTube(activeTrack, 0);
       return;
     }
 
-    // Try HTML5 audio stream with automatic 1.8s timeout fallback
+    // Try HTML5 audio stream with automatic 2.2s timeout fallback
     activeEngineRef.current = 'audio';
-    const streamUrl = api.getStreamUrl(track.id);
+    const streamUrl = api.getStreamUrl(activeTrack.id);
     audio.src = streamUrl;
     audio.load();
 
@@ -691,18 +756,18 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (playPromise !== undefined) {
       playPromise.catch((err) => {
         console.warn('Direct stream rejected, switching to YouTube engine:', err);
-        playWithYouTube(track, 0);
+        playWithYouTube(activeTrack, 0);
       });
     }
 
-    // Safeguard: if audio stays stuck at 0s without playing for 1.8s, trigger YouTube engine
+    // Bulletproof safeguard: if audio stays stuck at 0s without playing for 2.2s, trigger YouTube engine
     if (stallTimeoutRef.current) clearTimeout(stallTimeoutRef.current);
     stallTimeoutRef.current = setTimeout(() => {
-      if (audio.currentTime === 0 && !audio.paused && !isPlaying) {
+      if (!userExplicitPauseRef.current && (audio.currentTime === 0 || audio.readyState < 2)) {
         console.warn('Audio stuck at 0s, activating YouTube audio engine');
-        playWithYouTube(track, 0);
+        playWithYouTube(activeTrack, 0);
       }
-    }, 1800);
+    }, 2200);
   };
 
   const isSyncingFromRemoteRef = useRef(false);
@@ -1092,13 +1157,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         id="tides-hidden-yt-container"
         style={{
           position: 'fixed',
-          top: -9999,
-          left: -9999,
-          width: 1,
-          height: 1,
-          opacity: 0,
+          bottom: 0,
+          right: 0,
+          width: 240,
+          height: 240,
+          opacity: 0.002,
           pointerEvents: 'none',
-          zIndex: -100
+          zIndex: -50,
+          overflow: 'hidden'
         }}
         aria-hidden="true"
       >

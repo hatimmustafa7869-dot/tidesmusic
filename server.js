@@ -1301,7 +1301,7 @@ async function resolveStreamUrl(videoId) {
       '-f', 'bestaudio/best',
       '--get-url',
       `https://www.youtube.com/watch?v=${targetVideoId}`
-    ], { timeout: 20000 }, (err, stdout) => {
+    ], { timeout: 15000 }, (err, stdout) => {
       if (err) {
         // Fallback: search query resolution
         execFile(bin, [
@@ -1311,7 +1311,7 @@ async function resolveStreamUrl(videoId) {
           '-f', 'bestaudio/best',
           '--get-url',
           `ytsearch1:${targetVideoId} audio`
-        ], { timeout: 20000 }, (err2, stdout2) => {
+        ], { timeout: 15000 }, (err2, stdout2) => {
           if (err2) return reject(err2);
           const u2 = (stdout2 || '').trim().split('\n')[0];
           if (!u2 || !u2.startsWith('http')) return reject(new Error('No stream URL extracted'));
@@ -1335,6 +1335,58 @@ async function resolveStreamUrl(videoId) {
   });
 }
 
+// 6.1 RESOLVE TRACK ID ENDPOINT (Guarantees synthetic or Spotify songs have a real YouTube ID)
+const resolveCache = new Map();
+
+app.get('/api/resolve/:videoId', async (req, res) => {
+  const { videoId } = req.params;
+  const title = (req.query.title || '').toString();
+  const artist = (req.query.artist || '').toString();
+
+  // If already a valid 11-char YouTube ID
+  if (/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+    return res.json({ id: videoId, originalId: videoId });
+  }
+
+  const cacheKey = `${videoId}__${title}__${artist}`;
+  if (resolveCache.has(cacheKey)) {
+    return res.json(resolveCache.get(cacheKey));
+  }
+
+  let searchQuery = '';
+  if (videoId && videoId.startsWith('sp__')) {
+    const parts = videoId.split('__');
+    const songTitle = decodeURIComponent(parts[2] || '');
+    const songArtist = decodeURIComponent(parts[3] || '');
+    searchQuery = `${songTitle} ${songArtist}`.trim();
+  }
+  if (!searchQuery && (title || artist)) {
+    searchQuery = `${title} ${artist}`.trim();
+  }
+  if (!searchQuery) {
+    searchQuery = videoId;
+  }
+
+  try {
+    const results = await scrapeSearch(searchQuery);
+    if (results && results.length > 0 && results[0].id) {
+      const payload = {
+        id: results[0].id,
+        originalId: videoId,
+        title: results[0].title || title,
+        artist: results[0].artist || artist,
+        thumbnail: results[0].thumbnail || ''
+      };
+      resolveCache.set(cacheKey, payload);
+      return res.json(payload);
+    }
+  } catch (err) {
+    console.error('Resolve error for', videoId, ':', err.message);
+  }
+
+  res.status(404).json({ detail: 'Could not resolve track to YouTube video ID' });
+});
+
 app.get('/api/stream/:videoId', async (req, res) => {
   const { videoId } = req.params;
 
@@ -1349,6 +1401,16 @@ app.get('/api/stream/:videoId', async (req, res) => {
     headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
 
     const audioReq = https.get(streamUrl, { headers }, (audioRes) => {
+      // If upstream returned an error (e.g. 403 Forbidden from GoogleVideo on cloud IPs)
+      if (audioRes.statusCode >= 400) {
+        console.warn(`Upstream GoogleVideo returned ${audioRes.statusCode}, aborting stream pipe`);
+        if (!res.headersSent) {
+          res.status(502).json({ detail: `Upstream stream returned ${audioRes.statusCode}` });
+        }
+        audioRes.resume(); // drain stream
+        return;
+      }
+
       res.writeHead(audioRes.statusCode, {
         'Content-Type': audioRes.headers['content-type'] || 'audio/mp4',
         'Content-Length': audioRes.headers['content-length'],
@@ -1366,7 +1428,7 @@ app.get('/api/stream/:videoId', async (req, res) => {
     });
   } catch (err) {
     console.error('Audio stream error for video', videoId, ':', err.message);
-    res.status(500).json({ detail: 'Failed to resolve audio stream' });
+    if (!res.headersSent) res.status(502).json({ detail: 'Failed to resolve audio stream' });
   }
 });
 

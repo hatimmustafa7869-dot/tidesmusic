@@ -25,6 +25,7 @@ import { useAudio } from '../context/AudioContext';
 import { useJam } from '../context/JamContext';
 import { useLibrary } from '../context/LibraryContext';
 import { api } from '../services/api';
+import { Equalizer } from './Equalizer';
 import type { Track } from '../types';
 
 interface NowPlayingModalProps {
@@ -282,42 +283,69 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
 
   // Reusable controls & track info block
   const renderControls = () => (
-    <div className="flex flex-col items-center justify-center max-w-md mx-auto w-full space-y-5 sm:space-y-6">
-      {/* Cover Art with Vinyl Glow Effect */}
-      <div className="relative group">
-        {/* Spinning Vinyl Record Peek when Playing */}
+    <div className="flex flex-col items-center justify-center max-w-md mx-auto w-full space-y-4 sm:space-y-5">
+      {/* Futuristic HUD Telemetry Chip */}
+      <div className="hud-chip flex items-center gap-2 mb-1">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#00f2fe] animate-ping" />
+        <span className="tracking-widest">QUANTUM AUDIO // 96KHZ LOSSLESS</span>
+        <Equalizer isPlaying={isPlaying} variant="futuristic" className="h-3 ml-1" />
+      </div>
+
+      {/* Cover Art with Futuristic Holographic Vinyl Turntable */}
+      <div className="relative group flex items-center justify-center">
+        {/* Dynamic Ambient Cyber Pulse Halo */}
         <div
-          className={`absolute -right-6 top-3 w-56 h-56 sm:w-64 sm:h-64 md:w-80 md:h-80 rounded-full bg-gradient-to-tr from-zinc-950 via-zinc-900 to-zinc-950 border-4 border-zinc-800 shadow-2xl transition-all duration-700 pointer-events-none flex items-center justify-center ${
-            isPlaying ? 'opacity-90 translate-x-8 md:translate-x-12' : 'opacity-0 translate-x-0'
+          className={`absolute -inset-4 rounded-full bg-gradient-to-r from-[#00f2fe]/20 via-[#1ed760]/20 to-[#8b5cf6]/20 blur-2xl transition-opacity duration-700 pointer-events-none ${
+            isPlaying ? 'opacity-90 animate-cyber-pulse' : 'opacity-0'
+          }`}
+        />
+
+        {/* Futuristic Grooved Vinyl Record Peek when Playing */}
+        <div
+          className={`absolute -right-6 top-3 w-56 h-56 sm:w-64 sm:h-64 md:w-80 md:h-80 rounded-full border-2 border-white/10 shadow-[0_0_35px_rgba(0,0,0,0.9)] transition-all duration-700 pointer-events-none flex items-center justify-center overflow-hidden ${
+            isPlaying ? 'opacity-95 translate-x-8 md:translate-x-12' : 'opacity-0 translate-x-0'
           }`}
           style={{
-            animation: isPlaying ? 'spin 10s linear infinite' : 'none'
+            background: 'conic-gradient(from 180deg at 50% 50%, #070a12 0deg, #1b263b 45deg, #070a12 90deg, #1b263b 135deg, #070a12 180deg, #1b263b 225deg, #070a12 270deg, #1b263b 315deg, #070a12 360deg)',
+            animation: isPlaying ? 'cyber-orbit-spin 10s linear infinite' : 'none'
           }}
         >
-          <div className="w-20 h-20 md:w-24 md:h-24 rounded-full border-2 border-zinc-700 bg-[#121212] flex items-center justify-center">
-            <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-[#1ed760]/80 shadow-inner" />
+          {/* Laser Groove Concentric Rings */}
+          <div className="absolute inset-4 rounded-full border border-white/[0.06]" />
+          <div className="absolute inset-10 rounded-full border border-white/[0.07]" />
+          <div className="absolute inset-16 rounded-full border border-cyan-400/20" />
+          <div className="absolute inset-24 rounded-full border border-emerald-400/30" />
+
+          {/* Center Hologram Label */}
+          <div className="w-20 h-20 md:w-24 md:h-24 rounded-full border border-white/20 bg-[#0d1322] flex items-center justify-center shadow-[inset_0_0_15px_rgba(0,242,254,0.3)]">
+            <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-tr from-[#1ed760] to-[#00f2fe] shadow-[0_0_12px_rgba(0,242,254,0.8)]" />
           </div>
         </div>
 
-        {/* Front Album Card */}
-        <div className="relative w-56 h-56 sm:w-64 sm:h-64 md:w-80 md:h-80 rounded-3xl overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] bg-zinc-900 border border-white/10 group-hover:scale-[1.02] transition-transform duration-300">
+        {/* Front Album Card with Specular Cyber Border */}
+        <div className="relative w-56 h-56 sm:w-64 sm:h-64 md:w-80 md:h-80 rounded-3xl overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.95)] bg-zinc-950 border border-white/15 group-hover:scale-[1.02] transition-transform duration-300">
           <img
             src={currentTrack.thumbnail || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80'}
             alt={currentTrack.title}
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          {/* Holographic Scanline Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-60" />
+          {/* Specular Edge Highlight */}
+          <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent" />
         </div>
       </div>
 
       {/* Track Details & Favorite Button */}
       <div className="w-full flex items-center justify-between pt-1">
         <div className="min-w-0 flex-1 pr-3">
-          <h2 className="text-xl md:text-2xl font-black text-white truncate tracking-tight hover:text-[#1ed760] transition-colors cursor-default">
+          <h2 className="text-xl md:text-2xl font-black text-white truncate tracking-tight hover:text-[#00f2fe] transition-colors cursor-default">
             {currentTrack.title}
           </h2>
-          <p className="text-sm md:text-base text-zinc-400 truncate mt-0.5 font-medium">
-            {currentTrack.artist || 'Unknown Artist'}
+          <p className="text-sm md:text-base text-zinc-400 truncate mt-0.5 font-medium flex items-center gap-2">
+            <span>{currentTrack.artist || 'Unknown Artist'}</span>
+            <span className="w-1 h-1 rounded-full bg-cyan-400" />
+            <span className="text-xs text-cyan-400 font-mono">LOSSLESS</span>
           </p>
         </div>
         <div className="flex items-center gap-1 shrink-0">
@@ -328,7 +356,7 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
             }`}
             title={isFav ? 'Remove from favorites' : 'Save to favorites'}
           >
-            <Heart className={`w-6 h-6 md:w-7 md:h-7 ${isFav ? 'fill-current drop-shadow-[0_0_12px_rgba(30,215,96,0.6)]' : ''}`} />
+            <Heart className={`w-6 h-6 md:w-7 md:h-7 ${isFav ? 'fill-current drop-shadow-[0_0_12px_rgba(30,215,96,0.8)]' : ''}`} />
           </button>
 
           {onAddToPlaylist && (
@@ -369,7 +397,7 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
           {/* Tooltip on Hover */}
           {isScrubberHovered && scrubberHoverTime !== null && (
             <div
-              className="absolute -top-7 px-2 py-0.5 bg-black/90 text-[#1ed760] text-[11px] font-mono font-bold rounded shadow border border-white/10 pointer-events-none transform -translate-x-1/2"
+              className="absolute -top-7 px-2 py-0.5 bg-black/95 text-[#00f2fe] text-[11px] font-mono font-bold rounded shadow border border-cyan-500/30 pointer-events-none transform -translate-x-1/2"
               style={{
                 left: `${Math.max(5, Math.min(95, (scrubberHoverTime / (duration || 1)) * 100))}%`
               }}
@@ -379,13 +407,9 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
           )}
 
           {/* Background Track */}
-          <div className="w-full h-1.5 group-hover:h-2 bg-white/15 rounded-full overflow-hidden transition-all duration-150 relative">
+          <div className="w-full h-1.5 group-hover:h-2 bg-white/10 rounded-full overflow-hidden transition-all duration-150 relative">
             <div
-              className={`h-full transition-all duration-75 rounded-full ${
-                isScrubberHovered
-                  ? 'bg-gradient-to-r from-emerald-500 to-[#1ed760] shadow-[0_0_10px_rgba(30,215,96,0.7)]'
-                  : 'bg-white'
-              }`}
+              className="h-full transition-all duration-75 rounded-full bg-gradient-to-r from-[#00f2fe] via-[#1ed760] to-[#00f2fe] shadow-[0_0_12px_rgba(0,242,254,0.7)]"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
@@ -393,7 +417,7 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
 
         {/* Timestamp Numbers */}
         <div className="flex justify-between text-xs font-mono text-zinc-400 font-semibold px-0.5">
-          <span>{formatTime(displayTime)}</span>
+          <span className="text-cyan-400/90">{formatTime(displayTime)}</span>
           <span>{formatTime(duration)}</span>
         </div>
       </div>
@@ -403,12 +427,12 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
         <button
           onClick={toggleShuffle}
           className={`p-2.5 rounded-full transition-all relative ${
-            shuffle ? 'text-[#1ed760] bg-white/5' : 'text-zinc-400 hover:text-white'
+            shuffle ? 'text-[#00f2fe] bg-cyan-500/10' : 'text-zinc-400 hover:text-white'
           }`}
           title={`Shuffle: ${shuffle ? 'On' : 'Off'}`}
         >
           <Shuffle className="w-5 h-5" />
-          {shuffle && <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-[#1ed760] rounded-full" />}
+          {shuffle && <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-[#00f2fe] rounded-full shadow-[0_0_6px_#00f2fe]" />}
         </button>
 
         <button
@@ -416,22 +440,22 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
           className="p-2 text-zinc-400 hover:text-white transition flex flex-col items-center group"
           title="Rewind 10 seconds"
         >
-          <RotateCcw className="w-5 h-5 group-hover:scale-110 transition" />
-          <span className="text-[9px] font-bold text-zinc-400 group-hover:text-white">10s</span>
+          <RotateCcw className="w-5 h-5 group-hover:scale-110 group-hover:text-cyan-400 transition" />
+          <span className="text-[9px] font-bold text-zinc-400 group-hover:text-cyan-400">10s</span>
         </button>
 
         <button
           onClick={prevTrack}
-          className="p-2.5 text-white hover:text-[#1ed760] transition-colors active:scale-90"
+          className="p-2.5 text-white hover:text-[#00f2fe] transition-colors active:scale-90"
           title="Previous Track"
         >
           <SkipBack className="w-6 h-6 fill-current" />
         </button>
 
-        {/* Big Circular Play/Pause Button */}
+        {/* Big Circular Play/Pause Button with Futuristic Aura */}
         <button
           onClick={togglePlay}
-          className="p-4 rounded-full bg-[#1ed760] text-black hover:scale-108 active:scale-95 transition-all shadow-[0_0_30px_rgba(30,215,96,0.45)] group"
+          className="p-4 rounded-full bg-gradient-to-tr from-[#1ed760] via-[#00f2fe] to-[#1ed760] text-black hover:scale-108 active:scale-95 transition-all shadow-[0_0_35px_rgba(0,242,254,0.5)] group ring-2 ring-white/20"
           title={isPlaying ? 'Pause' : 'Play'}
         >
           {isLoading ? (

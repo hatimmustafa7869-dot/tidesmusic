@@ -90,26 +90,29 @@ export const Player: React.FC<PlayerProps> = ({
   const volumePercent = isMuted ? 0 : volume * 100;
 
   return (
-    <div className="relative z-40 bg-transparent md:bg-[#090d16]/85 md:backdrop-blur-3xl md:border-t md:border-white/[0.12] select-none text-white shrink-0 md:shadow-[0_-12px_40px_rgba(0,0,0,0.7)]">
+    <div className="relative z-40 bg-transparent md:bg-[#090d16]/90 md:backdrop-blur-3xl md:border-t md:border-white/[0.1] select-none text-white shrink-0 md:shadow-[0_-12px_40px_rgba(0,0,0,0.8)]">
+      {/* Top Laser Highlight Line */}
+      <div className="absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#00f2fe]/70 via-[#1ed760]/70 to-transparent pointer-events-none z-30" />
+
       {/* Floating Active Jam Sync Pill */}
       {isJamActive && (
         <div
           onClick={() => setIsJamModalOpen(true)}
-          className="absolute -top-7 left-1/2 transform -translate-x-1/2 px-3 py-0.5 rounded-t-xl bg-[#0c0c0e]/90 border border-b-0 border-[#1ed760]/40 text-white text-[11px] font-bold flex items-center gap-2 shadow-lg backdrop-blur-xl cursor-pointer hover:bg-zinc-900 transition"
+          className="absolute -top-7 left-1/2 transform -translate-x-1/2 px-3 py-0.5 rounded-t-xl bg-[#0c0c0e]/90 border border-b-0 border-[#00f2fe]/50 text-white text-[11px] font-bold flex items-center gap-2 shadow-[0_0_15px_rgba(0,242,254,0.3)] backdrop-blur-xl cursor-pointer hover:bg-zinc-900 transition"
         >
-          <span className="w-1.5 h-1.5 rounded-full bg-[#1ed760] animate-ping" />
-          <span className="text-[#1ed760] font-black">Jam:</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-[#00f2fe] animate-ping" />
+          <span className="text-[#00f2fe] font-black">Jam:</span>
           <span className="font-mono">{jamId}</span>
           <span className="text-zinc-400 font-normal">({participants.length} in sync)</span>
         </div>
       )}
 
-      {/* 1. Mobile Floating Mini Player (< md) matching Spotify Screenshot */}
+      {/* 1. Mobile Floating Mini Player (< md) with Futuristic Glow */}
       <div className="md:hidden px-2 pt-1 pb-1">
-        <div className="relative flex items-center justify-between h-14 px-2.5 rounded-2xl bg-[#0f1422]/90 backdrop-blur-3xl border border-white/[0.14] shadow-[0_10px_30px_rgba(0,0,0,0.7)] gap-2 overflow-hidden">
+        <div className="relative flex items-center justify-between h-14 px-2.5 rounded-2xl bg-[#0c121e]/95 backdrop-blur-3xl border border-white/[0.15] shadow-[0_10px_30px_rgba(0,0,0,0.8),0_0_20px_rgba(0,242,254,0.1)] gap-2 overflow-hidden">
           {/* Bottom Progress Bar */}
           <div
-            className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/[0.08] cursor-pointer"
+            className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-white/[0.08] cursor-pointer"
             onClick={(e) => {
               e.stopPropagation();
               const rect = e.currentTarget.getBoundingClientRect();
@@ -119,7 +122,7 @@ export const Player: React.FC<PlayerProps> = ({
             }}
           >
             <div
-              className="h-full bg-[#1ed760] transition-all duration-75"
+              className="h-full bg-gradient-to-r from-[#00f2fe] via-[#1ed760] to-[#00f2fe] shadow-[0_0_8px_rgba(0,242,254,0.8)] transition-all duration-75"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
@@ -129,7 +132,7 @@ export const Player: React.FC<PlayerProps> = ({
             onClick={onOpenNowPlaying}
             className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer py-1"
           >
-            <div className="relative w-10 h-10 rounded-xl overflow-hidden shrink-0 shadow bg-black/40 border border-white/10">
+            <div className="relative w-10 h-10 rounded-xl overflow-hidden shrink-0 shadow bg-black/40 border border-cyan-500/25">
               <img
                 src={currentTrack.thumbnail || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80'}
                 alt={currentTrack.title}
@@ -140,10 +143,11 @@ export const Player: React.FC<PlayerProps> = ({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 text-xs font-bold text-white truncate">
                 <span className="truncate">{currentTrack.title}</span>
-                <Equalizer isPlaying={isPlaying} className="w-3 h-3 shrink-0" />
+                <Equalizer isPlaying={isPlaying} variant="futuristic" className="h-2.5 shrink-0" />
               </div>
-              <div className="text-[11px] text-zinc-400 truncate mt-0.5 font-medium">
-                {currentTrack.artist || 'Unknown Artist'}
+              <div className="text-[11px] text-zinc-400 truncate mt-0.5 font-medium flex items-center gap-1.5">
+                <span className="truncate">{currentTrack.artist || 'Unknown Artist'}</span>
+                <span className="hud-chip py-0 px-1 text-[8px]">LOSSLESS</span>
               </div>
             </div>
           </div>
@@ -186,7 +190,7 @@ export const Player: React.FC<PlayerProps> = ({
             <button
               onClick={togglePlay}
               disabled={isLoading}
-              className="w-9 h-9 rounded-full bg-white hover:scale-105 active:scale-95 text-black flex items-center justify-center transition shadow-lg shrink-0 ml-1"
+              className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#1ed760] via-[#00f2fe] to-[#1ed760] hover:scale-105 active:scale-95 text-black flex items-center justify-center transition shadow-[0_0_15px_rgba(0,242,254,0.4)] shrink-0 ml-1 ring-1 ring-white/20"
               title={isPlaying ? 'Pause' : 'Play'}
             >
               {isLoading ? (
@@ -207,7 +211,7 @@ export const Player: React.FC<PlayerProps> = ({
         <div className="flex items-center gap-3.5 w-1/4 min-w-[200px] max-w-[320px]">
           <div
             onClick={onOpenNowPlaying}
-            className="relative w-14 h-14 rounded overflow-hidden shrink-0 cursor-pointer shadow group bg-[#282828]">
+            className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0 cursor-pointer shadow-[0_4px_16px_rgba(0,0,0,0.6)] group bg-[#111624] border border-cyan-500/20">
           <img
             src={currentTrack.thumbnail || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80'}
             alt={currentTrack.title}
@@ -218,13 +222,14 @@ export const Player: React.FC<PlayerProps> = ({
         <div className="min-w-0 flex-1">
           <div
             onClick={onOpenNowPlaying}
-            className="flex items-center gap-2 text-sm font-bold text-white truncate cursor-pointer hover:underline"
+            className="flex items-center gap-2 text-sm font-bold text-white truncate cursor-pointer hover:text-[#00f2fe] transition"
           >
             <span className="truncate">{currentTrack.title}</span>
-            <Equalizer isPlaying={isPlaying} className="w-3.5 h-3.5 shrink-0" />
+            <Equalizer isPlaying={isPlaying} variant="futuristic" className="h-3 shrink-0" />
           </div>
-          <div className="text-xs text-zinc-400 truncate mt-0.5 hover:underline hover:text-white cursor-pointer font-medium">
-            {currentTrack.artist || 'Unknown Artist'}
+          <div className="text-xs text-zinc-400 truncate mt-0.5 hover:text-white cursor-pointer font-medium flex items-center gap-2">
+            <span className="truncate">{currentTrack.artist || 'Unknown Artist'}</span>
+            <span className="hud-chip py-0 px-1 text-[8px]">LOSSLESS</span>
           </div>
         </div>
 
@@ -235,7 +240,7 @@ export const Player: React.FC<PlayerProps> = ({
           title={isFav ? 'Added to Liked Songs' : 'Save to Liked Songs'}
         >
           {isFav ? (
-            <CheckCircle2 className="w-5 h-5 fill-[#1ed760] text-black" />
+            <CheckCircle2 className="w-5 h-5 fill-[#1ed760] text-black drop-shadow-[0_0_8px_rgba(30,215,96,0.6)]" />
           ) : (
             <Heart className="w-5 h-5 text-zinc-400 hover:text-white" />
           )}
@@ -260,17 +265,17 @@ export const Player: React.FC<PlayerProps> = ({
           <button
             onClick={toggleShuffle}
             className={`p-1 transition relative ${
-              shuffle ? 'text-[#1ed760]' : 'text-zinc-400 hover:text-white'
+              shuffle ? 'text-[#00f2fe]' : 'text-zinc-400 hover:text-white'
             }`}
             title="Enable Shuffle"
           >
             <Shuffle className="w-4 h-4" />
-            {shuffle && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[#1ed760]" />}
+            {shuffle && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[#00f2fe] shadow-[0_0_6px_#00f2fe]" />}
           </button>
 
           <button
             onClick={prevTrack}
-            className="text-zinc-400 hover:text-white transition"
+            className="text-zinc-400 hover:text-[#00f2fe] transition"
             title="Previous track"
           >
             <SkipBack className="w-5 h-5 fill-current" />
@@ -279,7 +284,7 @@ export const Player: React.FC<PlayerProps> = ({
           <button
             onClick={togglePlay}
             disabled={isLoading}
-            className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-white hover:scale-105 active:scale-95 text-black flex items-center justify-center transition shadow-lg shrink-0"
+            className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-gradient-to-tr from-[#1ed760] via-[#00f2fe] to-[#1ed760] hover:scale-110 active:scale-95 text-black flex items-center justify-center transition shadow-[0_0_20px_rgba(0,242,254,0.45)] shrink-0 ring-2 ring-white/20"
             title={isPlaying ? 'Pause' : 'Play'}
           >
             {isLoading ? (
@@ -293,7 +298,7 @@ export const Player: React.FC<PlayerProps> = ({
 
           <button
             onClick={nextTrack}
-            className="text-zinc-400 hover:text-white transition"
+            className="text-zinc-400 hover:text-[#00f2fe] transition"
             title="Next track"
           >
             <SkipForward className="w-5 h-5 fill-current" />
@@ -302,18 +307,18 @@ export const Player: React.FC<PlayerProps> = ({
           <button
             onClick={toggleRepeat}
             className={`p-1 transition relative ${
-              repeat !== 'off' ? 'text-[#1ed760]' : 'text-zinc-400 hover:text-white'
+              repeat !== 'off' ? 'text-[#00f2fe]' : 'text-zinc-400 hover:text-white'
             }`}
             title={`Repeat mode: ${repeat}`}
           >
             {repeat === 'one' ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
-            {repeat !== 'off' && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[#1ed760]" />}
+            {repeat !== 'off' && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[#00f2fe] shadow-[0_0_6px_#00f2fe]" />}
           </button>
         </div>
 
         {/* Scrubber Bar */}
         <div className="flex items-center gap-2 w-full">
-          <span className="text-[11px] text-zinc-400 font-mono w-10 text-right">
+          <span className="text-[11px] text-cyan-400/80 font-mono w-10 text-right">
             {formatTime(currentTime)}
           </span>
 
@@ -328,11 +333,9 @@ export const Player: React.FC<PlayerProps> = ({
               seek(ratio * (duration || 0));
             }}
           >
-            <div className="w-full h-1 group-hover:h-1.5 bg-[#4d4d4d] rounded-full overflow-hidden transition-all duration-150">
+            <div className="w-full h-1 group-hover:h-1.5 bg-white/10 rounded-full overflow-hidden transition-all duration-150">
               <div
-                className={`h-full transition-all duration-75 ${
-                  isScrubberHovered ? 'bg-[#1ed760]' : 'bg-white'
-                }`}
+                className="h-full transition-all duration-75 rounded-full bg-gradient-to-r from-[#00f2fe] via-[#1ed760] to-[#00f2fe] shadow-[0_0_8px_rgba(0,242,254,0.7)]"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>

@@ -48,9 +48,9 @@ export const TrackRow: React.FC<TrackRowProps> = ({
     <div
       onClick={handleRowClick}
       onDoubleClick={handlePlay}
-      className={`group relative flex items-center justify-between px-3 sm:px-4 py-2.5 rounded-2xl transition-all duration-200 select-none cursor-pointer ${
+      className={`group relative flex items-center justify-between px-3 sm:px-4 py-2.5 rounded-2xl transition-all duration-200 select-none cursor-pointer gpu-layer ${
         isCurrent
-          ? 'bg-gradient-to-r from-white/[0.12] to-white/[0.04] backdrop-blur-xl border border-[#1ed760]/30 shadow-md'
+          ? 'bg-gradient-to-r from-cyan-500/15 via-[#1ed760]/10 to-transparent backdrop-blur-xl border border-cyan-400/30 shadow-[0_0_20px_rgba(0,242,254,0.15)]'
           : 'hover:bg-gradient-to-r hover:from-white/[0.08] hover:to-white/[0.02] hover:backdrop-blur-lg border border-transparent hover:border-white/[0.08]'
       }`}
     >
@@ -58,15 +58,15 @@ export const TrackRow: React.FC<TrackRowProps> = ({
         {/* Track Number / Play Icon / Equalizer */}
         <div className="w-4 sm:w-5 text-center flex items-center justify-center shrink-0">
           {isCurrent && isPlaying ? (
-            <Equalizer isPlaying={true} className="w-3.5 h-3.5" barColor="bg-[#1ed760]" />
+            <Equalizer isPlaying={true} variant="futuristic" className="h-3 shrink-0" />
           ) : (
             <>
-              <span className={`text-xs sm:text-sm group-hover:hidden font-mono ${isCurrent ? 'text-[#1ed760] font-bold' : 'text-zinc-500'}`}>
+              <span className={`text-xs sm:text-sm group-hover:hidden font-mono ${isCurrent ? 'text-[#00f2fe] font-bold' : 'text-zinc-500'}`}>
                 {index + 1}
               </span>
               <button
                 onClick={handlePlay}
-                className="hidden group-hover:flex text-white hover:scale-110 transition"
+                className="hidden group-hover:flex text-white hover:text-[#00f2fe] hover:scale-110 transition"
               >
                 <Play className="w-4 h-4 fill-current ml-0.5" />
               </button>
@@ -77,7 +77,7 @@ export const TrackRow: React.FC<TrackRowProps> = ({
         {/* Thumbnail */}
         <div
           onClick={handlePlay}
-          className="relative w-10 h-10 rounded-lg overflow-hidden shrink-0 cursor-pointer shadow bg-black/40"
+          className="relative w-10 h-10 rounded-lg overflow-hidden shrink-0 cursor-pointer shadow bg-black/40 border border-white/10 group-hover:border-cyan-500/30 transition-colors"
         >
           <img
             src={track.thumbnail || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80'}
@@ -92,13 +92,14 @@ export const TrackRow: React.FC<TrackRowProps> = ({
           <div
             onClick={handlePlay}
             className={`text-sm truncate cursor-pointer hover:underline ${
-              isCurrent ? 'text-[#1ed760] font-bold' : 'text-white font-medium'
+              isCurrent ? 'text-[#00f2fe] font-bold drop-shadow-[0_0_8px_rgba(0,242,254,0.4)]' : 'text-white font-medium'
             }`}
           >
             {track.title}
           </div>
-          <div className="text-xs text-zinc-400 truncate mt-0.5 hover:underline hover:text-white cursor-pointer font-normal">
-            {track.artist || 'Unknown Artist'}
+          <div className="text-xs text-zinc-400 truncate mt-0.5 hover:underline hover:text-white cursor-pointer font-normal flex items-center gap-2">
+            <span>{track.artist || 'Unknown Artist'}</span>
+            {isCurrent && <span className="hud-chip py-0 px-1 text-[8px]">ACTIVE</span>}
           </div>
         </div>
       </div>

@@ -274,6 +274,31 @@ export const api = {
     return `${API_BASE}/stream/${videoId}`;
   },
 
+  async resolveTrackId(track: Track): Promise<string> {
+    if (!track || !track.id) return '';
+    // If it's already an 11-char YouTube ID, return directly
+    if (/^[a-zA-Z0-9_-]{11}$/.test(track.id)) {
+      return track.id;
+    }
+
+    try {
+      const qParams = new URLSearchParams();
+      if (track.title) qParams.append('title', track.title);
+      if (track.artist) qParams.append('artist', track.artist);
+
+      const res = await fetch(`${API_BASE}/resolve/${encodeURIComponent(track.id)}?${qParams.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.id && /^[a-zA-Z0-9_-]{11}$/.test(data.id)) {
+          return data.id;
+        }
+      }
+    } catch (e) {
+      console.warn('Track resolution failed, using fallback ID:', e);
+    }
+    return track.id;
+  },
+
   parsePlaylistIdFromUrl(input: string): string | null {
     const trimmed = input.trim();
     if (!trimmed) return null;

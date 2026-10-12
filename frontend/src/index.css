@@ -176,3 +176,145 @@
 .animate-heart-pop {
   animation: heart-pop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
+
+/* ========================================================
+   FUTURISTIC CYBER-GLASS DESIGN SYSTEM & ANIMATIONS
+   ======================================================== */
+
+/* GPU Acceleration utility for locked 60/120fps performance */
+.gpu-layer {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform;
+}
+
+/* Futuristic Neon Halo Pulse */
+@keyframes cyber-pulse {
+  0%, 100% {
+    opacity: 0.45;
+    filter: drop-shadow(0 0 16px rgba(0, 242, 254, 0.45)) drop-shadow(0 0 35px rgba(30, 215, 96, 0.25));
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    filter: drop-shadow(0 0 28px rgba(0, 242, 254, 0.75)) drop-shadow(0 0 50px rgba(30, 215, 96, 0.45));
+    transform: scale(1.03);
+  }
+}
+
+.animate-cyber-pulse {
+  animation: cyber-pulse 4s ease-in-out infinite;
+}
+
+/* Futuristic Turntable / Orbital Spin with smooth 60fps rotation */
+@keyframes cyber-orbit-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-cyber-spin {
+  animation: cyber-orbit-spin 12s linear infinite;
+}
+
+/* Specular Laser Shimmer Sweep */
+@keyframes laser-sweep {
+  0% {
+    transform: translateX(-150%) skewX(-20deg);
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateX(250%) skewX(-20deg);
+    opacity: 0;
+  }
+}
+
+.animate-laser-sweep {
+  animation: laser-sweep 3.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Futuristic 5-Band High-Tech Equalizer */
+@keyframes eq-band-1 {
+  0%, 100% { height: 18%; }
+  30% { height: 95%; }
+  60% { height: 45%; }
+  85% { height: 80%; }
+}
+
+@keyframes eq-band-2 {
+  0%, 100% { height: 75%; }
+  25% { height: 25%; }
+  50% { height: 100%; }
+  75% { height: 35%; }
+}
+
+@keyframes eq-band-3 {
+  0%, 100% { height: 35%; }
+  35% { height: 90%; }
+  70% { height: 20%; }
+  90% { height: 65%; }
+}
+
+@keyframes eq-band-4 {
+  0%, 100% { height: 90%; }
+  20% { height: 40%; }
+  60% { height: 95%; }
+  80% { height: 30%; }
+}
+
+@keyframes eq-band-5 {
+  0%, 100% { height: 25%; }
+  40% { height: 85%; }
+  70% { height: 50%; }
+  90% { height: 100%; }
+}
+
+.animate-band-1 { animation: eq-band-1 0.75s ease-in-out infinite; }
+.animate-band-2 { animation: eq-band-2 0.65s ease-in-out infinite; }
+.animate-band-3 { animation: eq-band-3 0.85s ease-in-out infinite; }
+.animate-band-4 { animation: eq-band-4 0.70s ease-in-out infinite; }
+.animate-band-5 { animation: eq-band-5 0.80s ease-in-out infinite; }
+
+/* Futuristic Hologram Card & HUD Elements */
+.cyber-card {
+  position: relative;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(13, 19, 33, 0.5) 100%);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cyber-card:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(18, 28, 48, 0.65) 100%);
+  border-color: rgba(0, 242, 254, 0.35);
+  box-shadow: 0 16px 45px -8px rgba(0, 0, 0, 0.8), 0 0 25px rgba(0, 242, 254, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transform: translateY(-4px) scale(1.01);
+}
+
+/* Futuristic HUD Telemetry Chip */
+.hud-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: rgba(0, 242, 254, 0.08);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  color: #00f2fe;
+  box-shadow: 0 0 12px rgba(0, 242, 254, 0.15);
+}

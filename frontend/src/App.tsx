@@ -289,11 +289,11 @@ export const MainApp: React.FC = () => {
   };
 
   return (
-    <div className="relative flex flex-col h-screen w-screen overflow-hidden bg-[#07090e] text-white font-sans selection:bg-[#1ed760]/30 selection:text-white">
-      {/* Dynamic Ambient Lighting Canvas for Authentic Glassmorphism Refraction */}
-      <div className="pointer-events-none fixed -top-40 -left-40 w-[620px] h-[620px] bg-gradient-to-br from-indigo-500/25 via-purple-600/15 to-transparent rounded-full blur-[140px] z-0 animate-pulse duration-1000" />
-      <div className="pointer-events-none fixed -bottom-40 -right-40 w-[620px] h-[620px] bg-gradient-to-tl from-emerald-500/20 via-teal-600/15 to-transparent rounded-full blur-[140px] z-0" />
-      <div className="pointer-events-none fixed top-1/4 right-1/3 w-[520px] h-[520px] bg-gradient-to-tr from-cyan-500/15 via-blue-600/10 to-transparent rounded-full blur-[160px] z-0" />
+    <div className="relative flex flex-col h-screen w-screen overflow-hidden bg-[#04060b] text-white font-sans selection:bg-[#00f2fe]/30 selection:text-white">
+      {/* Dynamic Cyber Ambient Lighting Canvas */}
+      <div className="pointer-events-none fixed -top-40 -left-40 w-[640px] h-[640px] bg-gradient-to-br from-[#00f2fe]/20 via-[#8b5cf6]/15 to-transparent rounded-full blur-[140px] z-0 animate-pulse duration-1000 gpu-layer" />
+      <div className="pointer-events-none fixed -bottom-40 -right-40 w-[640px] h-[640px] bg-gradient-to-tl from-[#1ed760]/20 via-[#00f2fe]/15 to-transparent rounded-full blur-[140px] z-0 gpu-layer" />
+      <div className="pointer-events-none fixed top-1/3 right-1/4 w-[500px] h-[500px] bg-gradient-to-tr from-[#8b5cf6]/15 via-[#00f2fe]/10 to-transparent rounded-full blur-[160px] z-0 gpu-layer" />
 
       {/* 1. Spotify Global Desktop Top Bar / Mobile Header */}
       <Navbar
@@ -328,9 +328,9 @@ export const MainApp: React.FC = () => {
           onCloseMobile={() => setIsMobileSidebarOpen(false)}
         />
 
-        {/* Center: Main Content Panel (Glassmorphic Container with top specular highlight) */}
-        <div className="flex-1 flex flex-col h-full min-w-0 bg-[#0b0e17]/65 backdrop-blur-3xl rounded-none md:rounded-3xl overflow-hidden relative border-0 md:border md:border-white/[0.12] shadow-none md:shadow-[0_16px_48px_rgba(0,0,0,0.6)]">
-          <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/25 to-transparent pointer-events-none z-20" />
+        {/* Center: Main Content Panel (Futuristic Cyber-Glass Container) */}
+        <div className="flex-1 flex flex-col h-full min-w-0 bg-[#0a0e1a]/75 backdrop-blur-3xl rounded-none md:rounded-3xl overflow-hidden relative border-0 md:border md:border-white/[0.12] shadow-none md:shadow-[0_20px_60px_rgba(0,0,0,0.8),0_0_35px_rgba(0,242,254,0.06)]">
+          <div className="absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#00f2fe]/50 via-[#1ed760]/40 to-transparent pointer-events-none z-20" />
           <main className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar px-3 sm:px-4 md:px-7 py-2 sm:py-4 pb-36 md:pb-8">
             {currentView === 'home' && (
               <HomePage
