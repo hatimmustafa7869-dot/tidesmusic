@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   Heart,
   ListMusic,
+  ListPlus,
   Loader2,
   Maximize2,
   Mic2,
@@ -22,6 +23,7 @@ import { useAudio } from '../context/AudioContext';
 import { useJam } from '../context/JamContext';
 import { useLibrary } from '../context/LibraryContext';
 import { Equalizer } from './Equalizer';
+import type { Track } from '../types';
 
 interface PlayerProps {
   onOpenLyrics: () => void;
@@ -31,6 +33,7 @@ interface PlayerProps {
   isLyricsOpen?: boolean;
   isRightSidebarOpen?: boolean;
   onToggleRightSidebar?: () => void;
+  onAddToPlaylist?: (track: Track) => void;
 }
 
 export const Player: React.FC<PlayerProps> = ({
@@ -40,7 +43,8 @@ export const Player: React.FC<PlayerProps> = ({
   isQueueOpen,
   isLyricsOpen = false,
   isRightSidebarOpen = false,
-  onToggleRightSidebar
+  onToggleRightSidebar,
+  onAddToPlaylist
 }) => {
   const {
     currentTrack,
@@ -166,6 +170,19 @@ export const Player: React.FC<PlayerProps> = ({
               )}
             </button>
 
+            {onAddToPlaylist && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddToPlaylist(currentTrack);
+                }}
+                className="p-1.5 transition text-zinc-400 hover:text-white active:scale-90"
+                title="Add to Playlist"
+              >
+                <ListPlus className="w-4 h-4" />
+              </button>
+            )}
+
             <button
               onClick={togglePlay}
               disabled={isLoading}
@@ -223,6 +240,17 @@ export const Player: React.FC<PlayerProps> = ({
             <Heart className="w-5 h-5 text-zinc-400 hover:text-white" />
           )}
         </button>
+
+        {/* Add to Playlist Button */}
+        {onAddToPlaylist && (
+          <button
+            onClick={() => onAddToPlaylist(currentTrack)}
+            className="p-1.5 transition text-zinc-400 hover:text-white hover:bg-white/[0.08] rounded-full active:scale-95 shrink-0"
+            title="Add to Playlist"
+          >
+            <ListPlus className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       {/* Center: Controls & Scrubber */}

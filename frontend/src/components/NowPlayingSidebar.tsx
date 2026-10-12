@@ -1,17 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { CheckCircle2, Heart, Mic2, Music, Play, X } from 'lucide-react';
+import { CheckCircle2, Heart, ListPlus, Mic2, Music, Play, X } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import { useLibrary } from '../context/LibraryContext';
 import { api } from '../services/api';
+import type { Track } from '../types';
 
 interface NowPlayingSidebarProps {
   onClose: () => void;
   onOpenLyricsModal: () => void;
+  onAddToPlaylist?: (track: Track) => void;
 }
 
 export const NowPlayingSidebar: React.FC<NowPlayingSidebarProps> = ({
   onClose,
-  onOpenLyricsModal
+  onOpenLyricsModal,
+  onAddToPlaylist
 }) => {
   const { currentTrack, queue, queueIndex, playTrack } = useAudio();
   const { isFavorite, toggleFavorite } = useLibrary();
@@ -107,17 +110,29 @@ export const NowPlayingSidebar: React.FC<NowPlayingSidebarProps> = ({
             </p>
           </div>
 
-          <button
-            onClick={() => toggleFavorite(currentTrack)}
-            className="p-1 text-[#1ed760] hover:scale-110 active:scale-95 transition shrink-0"
-            title={isFav ? 'Remove from Liked Songs' : 'Save to Liked Songs'}
-          >
-            {isFav ? (
-              <CheckCircle2 className="w-6 h-6 fill-[#1ed760] text-black" />
-            ) : (
-              <Heart className="w-6 h-6 text-zinc-400 hover:text-white" />
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => toggleFavorite(currentTrack)}
+              className="p-1 text-[#1ed760] hover:scale-110 active:scale-95 transition"
+              title={isFav ? 'Remove from Liked Songs' : 'Save to Liked Songs'}
+            >
+              {isFav ? (
+                <CheckCircle2 className="w-6 h-6 fill-[#1ed760] text-black" />
+              ) : (
+                <Heart className="w-6 h-6 text-zinc-400 hover:text-white" />
+              )}
+            </button>
+
+            {onAddToPlaylist && (
+              <button
+                onClick={() => onAddToPlaylist(currentTrack)}
+                className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/[0.08] rounded-full transition active:scale-95"
+                title="Add to Playlist"
+              >
+                <ListPlus className="w-5 h-5" />
+              </button>
             )}
-          </button>
+          </div>
         </div>
 
         {/* Lyrics Preview Glass Card */}

@@ -17,12 +17,13 @@ import { LibraryProvider } from './context/LibraryContext';
 import { FavoritesPage } from './pages/FavoritesPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { HomePage } from './pages/HomePage';
+import { LibraryPage } from './pages/LibraryPage';
 import { PlaylistView } from './pages/PlaylistView';
 import { SearchPage } from './pages/SearchPage';
 import type { Track } from './types';
 
 interface NavState {
-  view: 'home' | 'search' | 'playlist' | 'favorites' | 'history';
+  view: 'home' | 'search' | 'playlist' | 'favorites' | 'history' | 'library';
   playlistId?: string;
   searchQuery?: string;
 }
@@ -30,6 +31,16 @@ interface NavState {
 const getInitialRoute = (): NavState => {
   try {
     const searchParams = new URLSearchParams(window.location.search);
+    const viewParam = searchParams.get('view');
+    if (viewParam === 'library') {
+      return { view: 'library' };
+    }
+    if (viewParam === 'favorites') {
+      return { view: 'favorites' };
+    }
+    if (viewParam === 'history') {
+      return { view: 'history' };
+    }
     const queryPl = searchParams.get('playlist') || searchParams.get('pl') || searchParams.get('id');
     if (queryPl) {
       return { view: 'playlist', playlistId: queryPl.trim() };
@@ -40,12 +51,18 @@ const getInitialRoute = (): NavState => {
     }
 
     const pathname = window.location.pathname;
+    if (pathname.includes('/library')) {
+      return { view: 'library' };
+    }
     const pathMatch = pathname.match(/^\/playlist\/(.+)/);
     if (pathMatch && pathMatch[1]) {
       return { view: 'playlist', playlistId: decodeURIComponent(pathMatch[1]).trim() };
     }
 
     const hash = window.location.hash;
+    if (hash.includes('library')) {
+      return { view: 'library' };
+    }
     const hashMatch = hash.match(/^#\/?playlist\/(.+)/);
     if (hashMatch && hashMatch[1]) {
       return { view: 'playlist', playlistId: decodeURIComponent(hashMatch[1]).trim() };
@@ -56,7 +73,7 @@ const getInitialRoute = (): NavState => {
 
 export const MainApp: React.FC = () => {
   const initialRoute = useRef(getInitialRoute()).current;
-  const [currentView, setCurrentView] = useState<'home' | 'search' | 'playlist' | 'favorites' | 'history'>(initialRoute.view);
+  const [currentView, setCurrentView] = useState<'home' | 'search' | 'playlist' | 'favorites' | 'history' | 'library'>(initialRoute.view);
   const [homeCategory, setHomeCategory] = useState<'all' | 'songs' | 'playlists'>('all');
   const [searchQuery, setSearchQuery] = useState<string>(initialRoute.searchQuery || '');
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>(initialRoute.playlistId || '');
@@ -182,6 +199,8 @@ export const MainApp: React.FC = () => {
         targetUrl = `/?view=favorites`;
       } else if (state.view === 'history') {
         targetUrl = `/?view=history`;
+      } else if (state.view === 'library') {
+        targetUrl = `/?view=library`;
       }
 
       const currentPathAndSearch = window.location.pathname + window.location.search;
@@ -350,6 +369,16 @@ export const MainApp: React.FC = () => {
                 onOpenAddToPlaylist={handleOpenAddToPlaylist}
               />
             )}
+
+            {currentView === 'library' && (
+              <LibraryPage
+                onSelectPlaylist={handleSelectPlaylist}
+                onOpenCreatePlaylist={() => setPlaylistModalMode('create')}
+                onOpenImportPlaylist={() => setPlaylistModalMode('import')}
+                onNavigateFavorites={() => setCurrentView('favorites')}
+                onOpenAddToPlaylist={handleOpenAddToPlaylist}
+              />
+            )}
           </main>
         </div>
 
@@ -361,6 +390,7 @@ export const MainApp: React.FC = () => {
               setNowPlayingTab('lyrics');
               setIsNowPlayingOpen(true);
             }}
+            onAddToPlaylist={handleOpenAddToPlaylist}
           />
         )}
       </div>
@@ -376,6 +406,7 @@ export const MainApp: React.FC = () => {
           setNowPlayingTab('player');
           setIsNowPlayingOpen(true);
         }}
+        onAddToPlaylist={handleOpenAddToPlaylist}
         isQueueOpen={isQueueOpen}
         isRightSidebarOpen={isRightSidebarOpen}
         onToggleRightSidebar={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
@@ -387,7 +418,7 @@ export const MainApp: React.FC = () => {
         onNavigate={handleNavigate}
         onOpenJam={() => setIsJamModalOpen(true)}
         onOpenCreate={() => setPlaylistModalMode('create')}
-        onOpenLibrary={() => setIsMobileSidebarOpen(true)}
+        onOpenLibrary={() => handleNavigate('library')}
         isJamActive={isJamActive}
       />
 
@@ -402,6 +433,7 @@ export const MainApp: React.FC = () => {
         isOpen={isNowPlayingOpen}
         onClose={() => setIsNowPlayingOpen(false)}
         initialTab={nowPlayingTab}
+        onAddToPlaylist={handleOpenAddToPlaylist}
       />
 
       {/* Playlist Create / Import / Add Track Modal */}

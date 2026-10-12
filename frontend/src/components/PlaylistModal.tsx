@@ -26,6 +26,11 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
   const [importUrl, setImportUrl] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState('');
+  const [currentMode, setCurrentMode] = useState(mode);
+
+  React.useEffect(() => {
+    setCurrentMode(mode);
+  }, [mode, isOpen]);
 
   if (!isOpen) return null;
 
@@ -84,7 +89,7 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
           <X className="w-5 h-5" />
         </button>
 
-        {mode === 'create' && (
+        {currentMode === 'create' && (
           <form onSubmit={handleCreate} className="space-y-4">
             <div className="flex items-center gap-3 mb-2">
               <div className="p-3 bg-[#1ed760]/10 text-[#1ed760] rounded-2xl border border-[#1ed760]/20">
@@ -145,7 +150,7 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
           </form>
         )}
 
-        {mode === 'import' && (
+        {currentMode === 'import' && (
           <form onSubmit={handleImport} className="space-y-4">
             <div className="flex items-center gap-3 mb-2">
               <div className="p-3 bg-[#1ed760]/10 text-[#1ed760] rounded-2xl border border-[#1ed760]/20">
@@ -208,7 +213,7 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
           </form>
         )}
 
-        {mode === 'add_track' && trackToAdd && (
+        {currentMode === 'add_track' && trackToAdd && (
           <div className="space-y-4">
             <div className="flex items-center gap-3 mb-2">
               <div className="p-3 bg-[#1ed760]/10 text-[#1ed760] rounded-xl">
@@ -220,7 +225,19 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
               </div>
             </div>
 
-            <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+            <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1 no-scrollbar">
+              {/* Option to create a brand new playlist for this track directly */}
+              <button
+                type="button"
+                onClick={() => setCurrentMode('create')}
+                className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-dashed border-white/20 text-white font-bold text-xs transition mb-2"
+              >
+                <div className="w-9 h-9 rounded-lg bg-[#1ed760]/20 text-[#1ed760] flex items-center justify-center shrink-0">
+                  <Plus className="w-5 h-5" />
+                </div>
+                <span>Create New Playlist with this track</span>
+              </button>
+
               {playlists.map(pl => (
                 <button
                   key={pl.id}

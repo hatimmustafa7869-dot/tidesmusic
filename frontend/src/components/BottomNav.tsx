@@ -49,18 +49,15 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       {/* 3. Your Library */}
       <button
         onClick={() => {
-          if (onOpenLibrary) {
-            onOpenLibrary();
-          } else {
-            onNavigate('favorites');
-          }
+          onNavigate('library');
+          onOpenLibrary?.();
         }}
         className={`flex flex-col items-center justify-center py-1 px-2.5 transition-all duration-150 active:scale-90 ${
-          currentView === 'favorites' || currentView === 'playlist' ? 'text-white' : 'text-zinc-400 hover:text-zinc-200'
+          currentView === 'library' || currentView === 'favorites' || currentView === 'playlist' ? 'text-white' : 'text-zinc-400 hover:text-zinc-200'
         }`}
       >
-        <Library className={`w-5 h-5 transition ${currentView === 'favorites' || currentView === 'playlist' ? 'text-[#1ed760] scale-110' : ''}`} />
-        <span className={`text-[10px] font-semibold mt-1 ${currentView === 'favorites' || currentView === 'playlist' ? 'text-white font-bold' : ''}`}>
+        <Library className={`w-5 h-5 transition ${currentView === 'library' || currentView === 'favorites' || currentView === 'playlist' ? 'text-[#1ed760] scale-110' : ''}`} />
+        <span className={`text-[10px] font-semibold mt-1 ${currentView === 'library' || currentView === 'favorites' || currentView === 'playlist' ? 'text-white font-bold' : ''}`}>
           Your Library
         </span>
       </button>

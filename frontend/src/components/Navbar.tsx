@@ -72,6 +72,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const getViewTitle = () => {
     switch (currentView) {
       case 'search': return 'Search';
+      case 'library': return 'Your Library';
       case 'favorites': return 'Liked Songs';
       case 'history': return 'Recently Played';
       case 'playlist': return 'Playlist';

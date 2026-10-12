@@ -4,6 +4,7 @@ import {
   ChevronDown,
   Heart,
   ListMusic,
+  ListPlus,
   Loader2,
   Mic2,
   Pause,
@@ -24,11 +25,13 @@ import { useAudio } from '../context/AudioContext';
 import { useJam } from '../context/JamContext';
 import { useLibrary } from '../context/LibraryContext';
 import { api } from '../services/api';
+import type { Track } from '../types';
 
 interface NowPlayingModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialTab?: 'player' | 'lyrics' | 'queue';
+  onAddToPlaylist?: (track: Track) => void;
 }
 
 interface ParsedLyricLine {
@@ -41,7 +44,8 @@ interface ParsedLyricLine {
 export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
   isOpen,
   onClose,
-  initialTab = 'player'
+  initialTab = 'player',
+  onAddToPlaylist
 }) => {
   const {
     currentTrack,
@@ -316,15 +320,27 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
             {currentTrack.artist || 'Unknown Artist'}
           </p>
         </div>
-        <button
-          onClick={() => toggleFavorite(currentTrack)}
-          className={`p-2.5 rounded-full hover:bg-white/10 transition-all transform active:scale-125 ${
-            isFav ? 'text-[#1ed760]' : 'text-zinc-400 hover:text-white'
-          }`}
-          title={isFav ? 'Remove from favorites' : 'Save to favorites'}
-        >
-          <Heart className={`w-6 h-6 md:w-7 md:h-7 ${isFav ? 'fill-current drop-shadow-[0_0_12px_rgba(30,215,96,0.6)]' : ''}`} />
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={() => toggleFavorite(currentTrack)}
+            className={`p-2.5 rounded-full hover:bg-white/10 transition-all transform active:scale-125 ${
+              isFav ? 'text-[#1ed760]' : 'text-zinc-400 hover:text-white'
+            }`}
+            title={isFav ? 'Remove from favorites' : 'Save to favorites'}
+          >
+            <Heart className={`w-6 h-6 md:w-7 md:h-7 ${isFav ? 'fill-current drop-shadow-[0_0_12px_rgba(30,215,96,0.6)]' : ''}`} />
+          </button>
+
+          {onAddToPlaylist && (
+            <button
+              onClick={() => onAddToPlaylist(currentTrack)}
+              className="p-2.5 rounded-full hover:bg-white/10 text-zinc-400 hover:text-white transition-all transform active:scale-95"
+              title="Add to Playlist"
+            >
+              <ListPlus className="w-6 h-6 md:w-7 md:h-7" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Interactive Progress Tracking Scrubber */}
@@ -863,6 +879,15 @@ export const NowPlayingModal: React.FC<NowPlayingModalProps> = ({
                 >
                   <SkipForward className="w-4 h-4 fill-current" />
                 </button>
+                {onAddToPlaylist && (
+                  <button
+                    onClick={() => onAddToPlaylist(currentTrack)}
+                    className="p-1.5 text-zinc-400 hover:text-white transition active:scale-95"
+                    title="Add to Playlist"
+                  >
+                    <ListPlus className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
           </div>

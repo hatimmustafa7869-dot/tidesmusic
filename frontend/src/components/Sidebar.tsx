@@ -48,11 +48,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [filterQuery, setFilterQuery] = useState('');
 
   const handleNav = (view: string, data?: any) => {
-    if (view === 'library') {
-      onNavigate('favorites', data);
-    } else {
-      onNavigate(view, data);
-    }
+    onNavigate(view, data);
     if (onCloseMobile) onCloseMobile();
   };
 
@@ -133,7 +129,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Top Header: "Your Library" */}
       <div className="flex items-center justify-between px-2 py-1 mb-2">
         <button
-          onClick={() => handleNav('favorites')}
+          onClick={() => handleNav('library')}
           className="flex items-center gap-2.5 text-base font-bold text-zinc-300 hover:text-white transition group"
         >
           <Library className="w-5 h-5 text-zinc-400 group-hover:text-[#1ed760] transition" />
