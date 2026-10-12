@@ -322,7 +322,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <h2 className="text-xl md:text-2xl font-black text-white tracking-tight">
-                Recommended Stations
+                Today's Biggest Hits
               </h2>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-[#1ed760]/15 text-[#1ed760] border border-[#1ed760]/30 shadow-[0_0_12px_rgba(30,215,96,0.25)]">
                 Trending

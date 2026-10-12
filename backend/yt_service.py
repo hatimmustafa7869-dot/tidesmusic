@@ -518,142 +518,231 @@ class YouTubeService:
         return result
 
     async def get_playlist(self, playlist_id: str) -> Dict[str, Any]:
-        """Fetches metadata and all tracks of a playlist via YouTube Data API v3, Spotify embed, or ytmusicapi."""
+        """Fetches metadata and all tracks of a playlist via YouTube Data API v3, Spotify embed, ytmusicapi, or yt-dlp."""
         clean_id = playlist_id.strip()
+        # Parse list parameter if full YouTube/YTMusic URL was passed
+        if "list=" in clean_id:
+            clean_id = clean_id.split("list=")[-1].split("&")[0].split("#")[0]
+
         if clean_id in self.CURATED_PLAYLISTS or clean_id.startswith("curated-") or f"curated-{clean_id}" in self.CURATED_PLAYLISTS:
             return await self.get_curated_playlist(clean_id)
 
         if clean_id.startswith("spotify:") or clean_id.startswith("spotify_") or "open.spotify.com" in clean_id or (len(clean_id) == 22 and not "_" in clean_id and not "-" in clean_id):
             return await self.get_spotify_playlist(clean_id)
 
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            # 1. Fetch playlist metadata
-            p_res = await client.get(
-                f"{self.base_url}/playlists",
-                params={"part": "snippet,contentDetails", "id": playlist_id, "key": self.api_key}
-            )
-            playlist_info = {}
-            if p_res.status_code == 200 and p_res.json().get("items"):
-                item = p_res.json()["items"][0]
-                snippet = item.get("snippet", {})
-                thumbs = snippet.get("thumbnails", {})
-                thumb = (thumbs.get("maxres") or thumbs.get("high") or thumbs.get("medium") or {}).get("url", "")
-                playlist_info = {
-                    "id": playlist_id,
-                    "title": snippet.get("title", ""),
-                    "description": snippet.get("description", ""),
-                    "author": snippet.get("channelTitle", ""),
-                    "thumbnail": thumb,
-                    "itemCount": item.get("contentDetails", {}).get("itemCount", 0)
-                }
+        # 1. YouTube Data API v3 (up to 20 pages = 1000 tracks)
+        if self.api_key:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                playlist_info = {}
+                try:
+                    p_res = await client.get(
+                        f"{self.base_url}/playlists",
+                        params={"part": "snippet,contentDetails", "id": clean_id, "key": self.api_key}
+                    )
+                    if p_res.status_code == 200 and p_res.json().get("items"):
+                        item = p_res.json()["items"][0]
+                        snippet = item.get("snippet", {})
+                        thumbs = snippet.get("thumbnails", {})
+                        thumb = (thumbs.get("maxres") or thumbs.get("high") or thumbs.get("medium") or {}).get("url", "")
+                        playlist_info = {
+                            "id": clean_id,
+                            "title": snippet.get("title", "Imported Playlist"),
+                            "description": snippet.get("description", ""),
+                            "author": snippet.get("channelTitle", "YouTube"),
+                            "thumbnail": thumb,
+                            "itemCount": item.get("contentDetails", {}).get("itemCount", 0)
+                        }
+                except Exception as e:
+                    print(f"Error fetching playlist info via Data API: {e}")
 
-            # 2. Fetch playlist items
-            tracks = []
-            page_token = None
-            for _ in range(2):  # up to 100 items
-                params = {
-                    "part": "snippet,contentDetails",
-                    "playlistId": playlist_id,
-                    "maxResults": 50,
-                    "key": self.api_key
-                }
-                if page_token:
-                    params["pageToken"] = page_token
-                
-                pi_res = await client.get(f"{self.base_url}/playlistItems", params=params)
-                if pi_res.status_code != 200:
-                    break
-                
-                pi_data = pi_res.json()
-                items = pi_data.get("items", [])
-                if not items:
-                    break
+                tracks = []
+                page_token = None
+                try:
+                    for _ in range(20):  # Fetch up to 1000 items
+                        params = {
+                            "part": "snippet,contentDetails",
+                            "playlistId": clean_id,
+                            "maxResults": 50,
+                            "key": self.api_key
+                        }
+                        if page_token:
+                            params["pageToken"] = page_token
+                        
+                        pi_res = await client.get(f"{self.base_url}/playlistItems", params=params)
+                        if pi_res.status_code != 200:
+                            break
+                        
+                        pi_data = pi_res.json()
+                        items = pi_data.get("items", [])
+                        if not items:
+                            break
 
-                video_ids = [it.get("contentDetails", {}).get("videoId") for it in items if it.get("contentDetails", {}).get("videoId")]
-                durations = await self._fetch_video_durations(client, video_ids)
+                        video_ids = [it.get("contentDetails", {}).get("videoId") for it in items if it.get("contentDetails", {}).get("videoId")]
+                        durations = await self._fetch_video_durations(client, video_ids)
 
-                for it in items:
-                    snippet = it.get("snippet", {})
-                    vid = it.get("contentDetails", {}).get("videoId") or snippet.get("resourceId", {}).get("videoId")
-                    if not vid:
-                        continue
-                    
-                    # Ignore deleted/private videos
-                    if snippet.get("title") in ["Private video", "Deleted video"]:
-                        continue
+                        for it in items:
+                            snippet = it.get("snippet", {})
+                            vid = it.get("contentDetails", {}).get("videoId") or snippet.get("resourceId", {}).get("videoId")
+                            if not vid:
+                                continue
+                            
+                            # Ignore deleted/private videos
+                            if snippet.get("title") in ["Private video", "Deleted video"]:
+                                continue
 
-                    thumbs = snippet.get("thumbnails", {})
-                    thumb = (thumbs.get("high") or thumbs.get("medium") or thumbs.get("default") or {}).get("url", "")
-                    dur_info = durations.get(vid, {"duration": 0, "durationFormatted": "0:00"})
+                            thumbs = snippet.get("thumbnails", {})
+                            thumb = (thumbs.get("high") or thumbs.get("medium") or thumbs.get("default") or {}).get("url", "")
+                            dur_info = durations.get(vid, {"duration": 0, "durationFormatted": "0:00"})
 
-                    tracks.append({
-                        "id": vid,
-                        "title": snippet.get("title", ""),
-                        "artist": snippet.get("videoOwnerChannelTitle") or snippet.get("channelTitle") or "Unknown Artist",
-                        "thumbnail": thumb,
-                        "duration": dur_info["duration"],
-                        "durationFormatted": dur_info["durationFormatted"],
-                        "type": "song"
-                    })
-                
-                page_token = pi_data.get("nextPageToken")
-                if not page_token:
-                    break
+                            tracks.append({
+                                "id": vid,
+                                "title": snippet.get("title", ""),
+                                "artist": snippet.get("videoOwnerChannelTitle") or snippet.get("channelTitle") or "Unknown Artist",
+                                "thumbnail": thumb,
+                                "duration": dur_info["duration"],
+                                "durationFormatted": dur_info["durationFormatted"],
+                                "type": "song"
+                            })
+                        
+                        page_token = pi_data.get("nextPageToken")
+                        if not page_token:
+                            break
+                except Exception as e:
+                    print(f"Error fetching playlist items via Data API: {e}")
 
-            if tracks or playlist_info:
-                if not playlist_info.get("thumbnail") and tracks:
-                    playlist_info["thumbnail"] = tracks[0]["thumbnail"]
-                return {
-                    "info": playlist_info,
-                    "tracks": tracks
-                }
+                if tracks:
+                    if not playlist_info.get("thumbnail") and tracks:
+                        playlist_info["thumbnail"] = tracks[0]["thumbnail"]
+                    if not playlist_info.get("title"):
+                        playlist_info["title"] = "Imported Playlist"
+                    playlist_info["itemCount"] = len(tracks)
+                    return {
+                        "info": playlist_info,
+                        "tracks": tracks
+                    }
 
-        # Fallback to ytmusicapi if API key failed or empty
-        return await self._fallback_ytmusic_playlist(playlist_id)
+        # Fallback to ytmusicapi and yt-dlp
+        return await self._fallback_ytmusic_playlist(clean_id)
 
     async def _fallback_ytmusic_playlist(self, playlist_id: str) -> Dict[str, Any]:
-        """Fallback to ytmusicapi to get playlist tracks."""
+        """Fallback to ytmusicapi and yt-dlp to get all playlist tracks without 100-track truncation."""
         loop = asyncio.get_event_loop()
-        try:
-            data = await loop.run_in_executor(None, lambda: ytmusic.get_playlist(playlist_id, limit=100))
-            thumbs = data.get("thumbnails", [])
-            thumb = thumbs[-1]["url"] if thumbs else ""
-            author = data.get("author", {})
-            author_name = author.get("name", "") if isinstance(author, dict) else str(author)
-            
-            tracks = []
-            for t in data.get("tracks", []):
-                vid = t.get("videoId")
-                if not vid:
-                    continue
-                t_thumbs = t.get("thumbnails", [])
-                t_thumb = t_thumbs[-1]["url"] if t_thumbs else ""
-                artists = ", ".join([a["name"] for a in t.get("artists", [])]) if t.get("artists") else ""
-                dur = t.get("duration_seconds") or 0
-                tracks.append({
-                    "id": vid,
-                    "title": t.get("title", ""),
-                    "artist": artists,
-                    "thumbnail": t_thumb,
-                    "duration": dur,
-                    "durationFormatted": t.get("duration") or format_duration(dur),
-                    "type": "song"
-                })
+        clean_id = playlist_id.strip()
+        if "list=" in clean_id:
+            clean_id = clean_id.split("list=")[-1].split("&")[0].split("#")[0]
 
-            return {
-                "info": {
-                    "id": playlist_id,
-                    "title": data.get("title", ""),
-                    "description": data.get("description", ""),
-                    "author": author_name,
-                    "thumbnail": thumb,
-                    "itemCount": len(tracks)
-                },
-                "tracks": tracks
-            }
+        # 1. Try ytmusicapi with limit=None (retrieves full playlist via continuations)
+        candidate_ids = [clean_id]
+        if clean_id.startswith("VL"):
+            candidate_ids.append(clean_id[2:])
+        else:
+            candidate_ids.append(f"VL{clean_id}")
+
+        for cand in candidate_ids:
+            try:
+                data = await loop.run_in_executor(None, lambda c=cand: ytmusic.get_playlist(c, limit=None))
+                if data and data.get("tracks"):
+                    thumbs = data.get("thumbnails", [])
+                    thumb = thumbs[-1]["url"] if thumbs else ""
+                    author = data.get("author", {})
+                    author_name = author.get("name", "") if isinstance(author, dict) else str(author)
+                    
+                    tracks = []
+                    for t in data.get("tracks", []):
+                        vid = t.get("videoId")
+                        if not vid:
+                            continue
+                        t_thumbs = t.get("thumbnails", [])
+                        t_thumb = t_thumbs[-1]["url"] if t_thumbs else ""
+                        artists = ", ".join([a["name"] for a in t.get("artists", [])]) if t.get("artists") else ""
+                        dur = t.get("duration_seconds") or 0
+                        tracks.append({
+                            "id": vid,
+                            "title": t.get("title", ""),
+                            "artist": artists,
+                            "thumbnail": t_thumb,
+                            "duration": dur,
+                            "durationFormatted": t.get("duration") or format_duration(dur),
+                            "type": "song"
+                        })
+
+                    if tracks:
+                        if not thumb and tracks:
+                            thumb = tracks[0]["thumbnail"]
+                        return {
+                            "info": {
+                                "id": clean_id,
+                                "title": data.get("title", "Imported Playlist"),
+                                "description": data.get("description", ""),
+                                "author": author_name or "YouTube Music",
+                                "thumbnail": thumb,
+                                "itemCount": len(tracks)
+                            },
+                            "tracks": tracks
+                        }
+            except Exception as e:
+                print(f"ytmusicapi fallback failed for {cand}: {e}")
+
+        # 2. Tertiary bulletproof fallback: yt-dlp flat playlist extraction
+        try:
+            def _extract_ytdlp():
+                import yt_dlp
+                ydl_opts = {
+                    'extract_flat': 'in_playlist',
+                    'skip_download': True,
+                    'quiet': True,
+                    'no_warnings': True,
+                    'playlist_items': '1-1000'
+                }
+                raw_id = clean_id[2:] if clean_id.startswith("VL") else clean_id
+                target_url = f"https://www.youtube.com/playlist?list={raw_id}"
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    return ydl.extract_info(target_url, download=False)
+
+            info = await loop.run_in_executor(None, _extract_ytdlp)
+            if info:
+                raw_entries = info.get("entries") or []
+                tracks = []
+                for entry in raw_entries:
+                    if not entry:
+                        continue
+                    vid = entry.get("id")
+                    if not vid:
+                        continue
+                    title = entry.get("title") or "Unknown Title"
+                    if title in ["Private video", "Deleted video"]:
+                        continue
+                    uploader = entry.get("uploader") or entry.get("channel") or entry.get("artist") or "YouTube Music"
+                    dur = int(entry.get("duration") or 0)
+                    thumbs = entry.get("thumbnails") or []
+                    thumb = thumbs[-1].get("url") if thumbs else f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg"
+                    tracks.append({
+                        "id": vid,
+                        "title": title,
+                        "artist": uploader,
+                        "thumbnail": thumb,
+                        "duration": dur,
+                        "durationFormatted": format_duration(dur),
+                        "type": "song"
+                    })
+
+                if tracks:
+                    pl_thumb = info.get("thumbnails", [{}])[-1].get("url") if info.get("thumbnails") else tracks[0]["thumbnail"]
+                    return {
+                        "info": {
+                            "id": clean_id,
+                            "title": info.get("title") or "Imported Playlist",
+                            "description": info.get("description") or "",
+                            "author": info.get("uploader") or info.get("channel") or "YouTube",
+                            "thumbnail": pl_thumb,
+                            "itemCount": len(tracks)
+                        },
+                        "tracks": tracks
+                    }
         except Exception as e:
-            print("ytmusic fallback playlist error:", e)
-            return {"info": {"id": playlist_id, "title": "Playlist", "thumbnail": ""}, "tracks": []}
+            print(f"yt-dlp fallback playlist error: {e}")
+
+        return {"info": {"id": clean_id, "title": "Playlist", "thumbnail": ""}, "tracks": []}
 
     async def get_home_feed(self) -> Dict[str, Any]:
         """Fetches top charts, trending music, and curated mood/genre playlists for the Home screen."""

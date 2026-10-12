@@ -170,6 +170,10 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
                 className="w-full px-4 py-2.5 bg-white/[0.05] border border-white/[0.08] focus:border-[#1ed760] rounded-xl text-white placeholder-zinc-500 focus:outline-none transition text-sm backdrop-blur-md"
                 autoFocus
               />
+              <p className="text-[11px] text-zinc-400 mt-1.5 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#1ed760]" />
+                Full import supported (100 to 1,000+ tracks from YouTube, YT Music & Spotify)
+              </p>
             </div>
 
             {importError && (
@@ -194,7 +198,7 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
                 {isImporting ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin text-black" />
-                    Importing...
+                    Importing all tracks...
                   </>
                 ) : (
                   'Import & Save'

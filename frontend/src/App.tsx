@@ -65,6 +65,7 @@ export const MainApp: React.FC = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const [isNowPlayingOpen, setIsNowPlayingOpen] = useState(false);
+  const [nowPlayingTab, setNowPlayingTab] = useState<'player' | 'lyrics' | 'queue'>('player');
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true); // Open by default matching screenshot
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
@@ -356,7 +357,10 @@ export const MainApp: React.FC = () => {
         {isRightSidebarOpen && (
           <NowPlayingSidebar
             onClose={() => setIsRightSidebarOpen(false)}
-            onOpenLyricsModal={() => setIsNowPlayingOpen(true)}
+            onOpenLyricsModal={() => {
+              setNowPlayingTab('lyrics');
+              setIsNowPlayingOpen(true);
+            }}
           />
         )}
       </div>
@@ -364,8 +368,14 @@ export const MainApp: React.FC = () => {
       {/* 3. Spotify Bottom Audio Player Bar */}
       <Player
         onOpenQueue={() => setIsQueueOpen(!isQueueOpen)}
-        onOpenLyrics={() => setIsNowPlayingOpen(true)}
-        onOpenNowPlaying={() => setIsNowPlayingOpen(true)}
+        onOpenLyrics={() => {
+          setNowPlayingTab('lyrics');
+          setIsNowPlayingOpen(true);
+        }}
+        onOpenNowPlaying={() => {
+          setNowPlayingTab('player');
+          setIsNowPlayingOpen(true);
+        }}
         isQueueOpen={isQueueOpen}
         isRightSidebarOpen={isRightSidebarOpen}
         onToggleRightSidebar={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
@@ -391,6 +401,7 @@ export const MainApp: React.FC = () => {
       <NowPlayingModal
         isOpen={isNowPlayingOpen}
         onClose={() => setIsNowPlayingOpen(false)}
+        initialTab={nowPlayingTab}
       />
 
       {/* Playlist Create / Import / Add Track Modal */}

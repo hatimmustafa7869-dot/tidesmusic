@@ -414,24 +414,28 @@ def create_user_playlist(
         
         inserted_tracks = []
         if tracks:
+            rows = []
             for idx, tr in enumerate(tracks):
                 track_row_id = str(uuid.uuid4())
-                conn.execute(
+                rows.append((
+                    track_row_id,
+                    playlist_id,
+                    tr.get("id"),
+                    tr.get("title", ""),
+                    tr.get("artist", ""),
+                    tr.get("thumbnail", ""),
+                    tr.get("duration", 0),
+                    tr.get("durationFormatted", "0:00"),
+                    idx
+                ))
+                inserted_tracks.append(tr)
+
+            if rows:
+                conn.executemany(
                     """INSERT INTO playlist_tracks (id, playlist_id, track_id, title, artist, thumbnail, duration, duration_formatted, position)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (
-                        track_row_id,
-                        playlist_id,
-                        tr["id"],
-                        tr.get("title", ""),
-                        tr.get("artist", ""),
-                        tr.get("thumbnail", ""),
-                        tr.get("duration", 0),
-                        tr.get("durationFormatted", "0:00"),
-                        idx
-                    )
+                    rows
                 )
-                inserted_tracks.append(tr)
 
             if not thumbnail and inserted_tracks and inserted_tracks[0].get("thumbnail"):
                 conn.execute("UPDATE playlists SET thumbnail = ? WHERE id = ?", (inserted_tracks[0]["thumbnail"], playlist_id))
@@ -530,6 +534,7 @@ def add_batch_tracks_to_playlist(playlist_id: str, user_id: str, tracks: List[Di
 
         inserted_count = 0
         first_thumb = pl["thumbnail"]
+        rows = []
 
         for tr in tracks:
             tid = tr.get("id")
@@ -541,24 +546,27 @@ def add_batch_tracks_to_playlist(playlist_id: str, user_id: str, tracks: List[Di
             if not first_thumb and thumb:
                 first_thumb = thumb
 
-            conn.execute(
-                """INSERT INTO playlist_tracks (id, playlist_id, track_id, title, artist, thumbnail, duration, duration_formatted, position)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    track_row_id,
-                    playlist_id,
-                    tid,
-                    tr.get("title", ""),
-                    tr.get("artist", ""),
-                    thumb,
-                    tr.get("duration", 0),
-                    tr.get("durationFormatted", "0:00"),
-                    pos
-                )
-            )
+            rows.append((
+                track_row_id,
+                playlist_id,
+                tid,
+                tr.get("title", ""),
+                tr.get("artist", ""),
+                thumb,
+                tr.get("duration", 0),
+                tr.get("durationFormatted", "0:00"),
+                pos
+            ))
             existing_tracks.add(tid)
             pos += 1
             inserted_count += 1
+
+        if rows:
+            conn.executemany(
+                """INSERT INTO playlist_tracks (id, playlist_id, track_id, title, artist, thumbnail, duration, duration_formatted, position)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                rows
+            )
 
         if first_thumb and first_thumb != pl["thumbnail"]:
             conn.execute("UPDATE playlists SET thumbnail = ? WHERE id = ?", (first_thumb, playlist_id))
@@ -650,6 +658,7 @@ def save_shared_playlist(
                 r[0] for r in conn.execute("SELECT track_id FROM playlist_tracks WHERE playlist_id = ?", (playlist_id,)).fetchall()
             )
             pos = conn.execute("SELECT COUNT(*) FROM playlist_tracks WHERE playlist_id = ?", (playlist_id,)).fetchone()[0]
+            rows = []
 
             for idx, tr in enumerate(tracks):
                 tid = tr.get("id")
@@ -662,23 +671,26 @@ def save_shared_playlist(
 
                 if tid not in existing_track_ids:
                     track_row_id = str(uuid.uuid4())
-                    conn.execute(
-                        """INSERT INTO playlist_tracks (id, playlist_id, track_id, title, artist, thumbnail, duration, duration_formatted, position)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (
-                            track_row_id,
-                            playlist_id,
-                            tid,
-                            tr.get("title", ""),
-                            tr.get("artist", ""),
-                            tr_thumb,
-                            tr.get("duration", 0),
-                            tr.get("durationFormatted", "0:00"),
-                            pos + idx
-                        )
-                    )
+                    rows.append((
+                        track_row_id,
+                        playlist_id,
+                        tid,
+                        tr.get("title", ""),
+                        tr.get("artist", ""),
+                        tr_thumb,
+                        tr.get("duration", 0),
+                        tr.get("durationFormatted", "0:00"),
+                        pos + len(rows)
+                    ))
                     existing_track_ids.add(tid)
                 inserted_tracks.append(tr)
+
+            if rows:
+                conn.executemany(
+                    """INSERT INTO playlist_tracks (id, playlist_id, track_id, title, artist, thumbnail, duration, duration_formatted, position)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    rows
+                )
 
         conn.commit()
         export_disaster_recovery_snapshot()
